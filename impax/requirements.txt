@@ -2,3 +2,4 @@ jax
 jaxlib
 pytest
 tensorflow
+scikit-image
