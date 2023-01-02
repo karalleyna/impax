@@ -1,5 +1,6 @@
 jax
 jaxlib
 pytest
-tensorflow
+tensorflow-macos
 scikit-image
+matplotlib
