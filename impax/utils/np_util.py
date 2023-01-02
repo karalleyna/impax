@@ -115,7 +115,7 @@ def zero_by_mask(mask, vals, replace_with=0.0):
       Numpy array with shape [..., channel_count] with 0 in invalid locations.
     """
     mask = jnp.reshape(mask, vals.shape[:-1])
-    vals = jnp.where(jnp.logical_not(mask), replace_with, vals)
+    vals = jnp.where(mask[..., None], vals, replace_with)
     return vals
 
 
@@ -128,7 +128,7 @@ def make_mask(im, thresh=0.0):
 
 def make_pixel_mask(im):
     """Computes a (height, width) mask that is true when any channel is true."""
-    channels_valid = im.astype(jnp.bool)
+    channels_valid = im.astype(bool)
     mask = jnp.any(channels_valid, axis=2)
     assert len(mask.shape) == 2
     return mask
