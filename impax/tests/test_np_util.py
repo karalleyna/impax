@@ -13,7 +13,7 @@ import tensorflow as tf
 from jax import random
 
 # local
-from impax.utils import np_util
+from impax.utils import jnp_util
 
 
 def batch_np(arr, batch_size):
@@ -123,7 +123,7 @@ def sample_surface(quadrics, centers, radii, length, height, width, renormalize)
 @pytest.mark.parametrize("batch_size", [2, 4, 8, 16])
 def test_batch_np(batch_size, key=random.PRNGKey(0)):
     x = random.uniform(key, shape=(batch_size,))
-    ret = np_util.batch_jnp(x, batch_size)
+    ret = jnp_util.batch_jnp(x, batch_size)
     ground_truth = batch_np(np.array(x), batch_size)
     assert jnp.allclose(ret, ground_truth)
 
@@ -133,7 +133,7 @@ def test_batch_np(batch_size, key=random.PRNGKey(0)):
 @pytest.mark.parametrize("is_screen_space", [True, False])
 @pytest.mark.parametrize("is_homogeneous", [True, False])
 def test_make_coordinate_grid(height, width, is_screen_space, is_homogeneous):
-    ret = np_util.make_coordinate_grid(height, width, is_screen_space, is_homogeneous)
+    ret = jnp_util.make_coordinate_grid(height, width, is_screen_space, is_homogeneous)
     ground_truth = make_coordinate_grid(height, width, is_screen_space, is_homogeneous)
     assert jnp.allclose(ret, ground_truth)
 
@@ -144,7 +144,7 @@ def test_make_coordinate_grid(height, width, is_screen_space, is_homogeneous):
 @pytest.mark.parametrize("is_screen_space", [True, False])
 @pytest.mark.parametrize("is_homogeneous", [True, False])
 def test_make_coordinate_grid_3d(length, height, width, is_screen_space, is_homogeneous):
-    ret = np_util.make_coordinate_grid_3d(length, height, width, is_screen_space, is_homogeneous)
+    ret = jnp_util.make_coordinate_grid_3d(length, height, width, is_screen_space, is_homogeneous)
     ground_truth = make_coordinate_grid_3d(length, height, width, is_screen_space, is_homogeneous)
     assert jnp.allclose(ret, ground_truth)
 
@@ -155,7 +155,7 @@ def test_filter_valid(mask_shape, vals_shape, key=random.PRNGKey(0)):
     key0, key1 = random.split(key)
     mask = random.randint(key0, shape=mask_shape, minval=0, maxval=2).astype(bool)
     vals = random.normal(key1, shape=vals_shape)
-    ret = np_util.filter_valid(mask, vals)
+    ret = jnp_util.filter_valid(mask, vals)
     ground_truth = filter_valid(np.array(mask), np.array(vals))
     assert jnp.allclose(ret, ground_truth)
 
@@ -166,7 +166,7 @@ def test_zero_by_mask(mask_shape, vals_shape, replace_with=0.0, key=random.PRNGK
     key0, key1 = random.split(key)
     mask = random.randint(key0, shape=mask_shape, minval=0, maxval=2).astype(bool)
     vals = random.normal(key1, shape=vals_shape)
-    ret = np_util.zero_by_mask(mask, vals, replace_with)
+    ret = jnp_util.zero_by_mask(mask, vals, replace_with)
     ground_truth = zero_by_mask(np.array(mask), np.array(vals), replace_with)
     assert jnp.allclose(ret, ground_truth)
 
@@ -174,7 +174,7 @@ def test_zero_by_mask(mask_shape, vals_shape, replace_with=0.0, key=random.PRNGK
 @pytest.mark.parametrize("im_shape", [(8, 3)])
 def test_make_mask(im_shape, thresh=0.0, key=random.PRNGKey(0)):
     im = random.uniform(key, shape=im_shape)
-    ret = np_util.make_mask(im, thresh)
+    ret = jnp_util.make_mask(im, thresh)
     ground_truth = make_mask(np.array(im), thresh)
     assert jnp.allclose(ret, ground_truth)
 
@@ -182,13 +182,13 @@ def test_make_mask(im_shape, thresh=0.0, key=random.PRNGKey(0)):
 @pytest.mark.parametrize("im_shape", [(5, 8, 3)])
 def test_make_pixel_mask(im_shape, key=random.PRNGKey(0)):
     im = random.uniform(key, shape=im_shape)
-    ret = np_util.make_pixel_mask(im)
+    ret = jnp_util.make_pixel_mask(im)
     ground_truth = make_pixel_mask(np.array(im))
     assert jnp.allclose(ret, ground_truth)
 
 
 @pytest.mark.parametrize("radius", [8, 3])
 def test_thresh_and_radius_to_distance(radius, thresh=0.0):
-    ret = np_util.thresh_and_radius_to_distance(radius, thresh)
+    ret = jnp_util.thresh_and_radius_to_distance(radius, thresh)
     ground_truth = thresh_and_radius_to_distance(radius, thresh)
     assert jnp.allclose(ret, ground_truth)
