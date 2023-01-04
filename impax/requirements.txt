@@ -5,3 +5,4 @@ tensorflow-macos
 scikit-image
 matplotlib
 trimesh
+pandas
