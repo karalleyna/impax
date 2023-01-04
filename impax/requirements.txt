@@ -6,3 +6,4 @@ scikit-image
 matplotlib
 trimesh
 pandas
+apache-beam
