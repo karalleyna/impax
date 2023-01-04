@@ -1,6 +1,6 @@
-"""References:
-
-
+"""
+References:
+https://github.com/google/ldif/blob/master/ldif/util/camera_util.py
 """
 
 import jax.numpy as jnp
@@ -70,7 +70,6 @@ def look_at_np(eye, center, world_up):
     """
     batch_size = center.shape[0]
 
-    vector_degeneracy_cutoff = 1e-6
     forward = center - eye
     forward_norm = jnp.linalg.norm(forward, ord=2, axis=1, keepdims=True)
     # assert forward_norm >= vector_degeneracy_cutoff
