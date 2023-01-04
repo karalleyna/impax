@@ -194,9 +194,11 @@ def read_cam_file(path, verbose=False):
         # yf = math.atan(aspect * math.tan(xfov))
         rotation = jnp.stack([right, up, -towards], axis=1)
         rotation_4x4 = jnp.eye(4)
-        rotation_4x4[:3, :3] = rotation
-        cam2world = rotation_4x4.copy()
-        cam2world[:3, 3] = viewpoint
+        rotation_4x4 = jnp.stack([rotation_4x4[:3, :3], rotation[3:, 3:]], axis=0)
+        cam2world = jnp.stack(
+            [jnp.stack([rotation_4x4[:3, :3], viewpoint], axis=1), rotation_4x4[3:]],
+            axis=0,
+        )
         cam2worlds.append(cam2world)
         xfovs.append(xfov)
     cam2worlds = jnp.stack(cam2worlds, axis=0).astype(jnp.float32)
