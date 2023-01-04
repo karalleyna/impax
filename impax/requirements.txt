@@ -4,3 +4,6 @@ pytest
 tensorflow-macos
 scikit-image
 matplotlib
+trimesh
+pandas
+apache-beam
