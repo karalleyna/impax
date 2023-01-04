@@ -22,8 +22,7 @@ import numpy as np
 import tensorflow as tf
 # ldif is an internal package, should be imported last.
 # pylint: disable=g-bad-import-order
-from ldif.util import camera_util, np_util, tf_util
-
+from ldif.ldif.util import camera_util, np_util, tf_util
 # pylint: enable=g-bad-import-order
 
 

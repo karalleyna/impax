@@ -6,6 +6,7 @@ https://github.com/google/ldif/blob/master/ldif/util/np_util.py
 """
 
 import jax.numpy as jnp
+
 # global
 import numpy as np
 import pytest
@@ -45,7 +46,9 @@ def make_coordinate_grid_3d(length, height, width, is_screen_space, is_homogeneo
         x_coords /= width
         y_coords /= height
         z_coords /= length
-    grid_x, grid_y, grid_z = np.meshgrid(x_coords, y_coords, z_coords, sparse=False, indexing="ij")
+    grid_x, grid_y, grid_z = np.meshgrid(
+        x_coords, y_coords, z_coords, sparse=False, indexing="ij"
+    )
     if is_homogeneous:
         homogeneous_coords = np.ones_like(grid_x)
         grid = np.stack([grid_x, grid_y, grid_z, homogeneous_coords], axis=3)
@@ -89,7 +92,9 @@ def thresh_and_radius_to_distance(radius, thresh):
 
 def sample_surface(quadrics, centers, radii, length, height, width, renormalize):
     quadric_count = quadrics.shape[0]
-    homogeneous_coords = make_coordinate_grid_3d(length, height, width, is_screen_space=False, is_homogeneous=True)
+    homogeneous_coords = make_coordinate_grid_3d(
+        length, height, width, is_screen_space=False, is_homogeneous=True
+    )
     homogeneous_coords = np.reshape(homogeneous_coords, [length, height, width, 4])
     homogeneous_coords[:, :, :, :3] -= 0.5
     flat_coords = np.reshape(homogeneous_coords, [length * height * width, 4])
@@ -110,8 +115,12 @@ def sample_surface(quadrics, centers, radii, length, height, width, renormalize)
         squared_diff = offset_coords[:, :3] * offset_coords[:, :3]
         scale = np.reciprocal(np.minimum(-2 * radius, 1e-6))
         bf_weights = np.exp(np.sum(scale * squared_diff, axis=1))
-        volume_addition = np.reshape(algebraic_distance * bf_weights, [length, height, width, 1])
-        max_bf_weights = np.maximum(np.reshape(bf_weights, [length, height, width, 1]), max_bf_weights)
+        volume_addition = np.reshape(
+            algebraic_distance * bf_weights, [length, height, width, 1]
+        )
+        max_bf_weights = np.maximum(
+            np.reshape(bf_weights, [length, height, width, 1]), max_bf_weights
+        )
         total_bf_weights += np.reshape(bf_weights, [length, height, width, 1])
         surface_volume += volume_addition
     if renormalize:
@@ -143,9 +152,15 @@ def test_make_coordinate_grid(height, width, is_screen_space, is_homogeneous):
 @pytest.mark.parametrize("width", [8, 16])
 @pytest.mark.parametrize("is_screen_space", [True, False])
 @pytest.mark.parametrize("is_homogeneous", [True, False])
-def test_make_coordinate_grid_3d(length, height, width, is_screen_space, is_homogeneous):
-    ret = jnp_util.make_coordinate_grid_3d(length, height, width, is_screen_space, is_homogeneous)
-    ground_truth = make_coordinate_grid_3d(length, height, width, is_screen_space, is_homogeneous)
+def test_make_coordinate_grid_3d(
+    length, height, width, is_screen_space, is_homogeneous
+):
+    ret = jnp_util.make_coordinate_grid_3d(
+        length, height, width, is_screen_space, is_homogeneous
+    )
+    ground_truth = make_coordinate_grid_3d(
+        length, height, width, is_screen_space, is_homogeneous
+    )
     assert jnp.allclose(ret, ground_truth)
 
 
@@ -188,7 +203,7 @@ def test_make_pixel_mask(im_shape, key=random.PRNGKey(0)):
 
 
 @pytest.mark.parametrize("radius", [8, 3])
-def test_thresh_and_radius_to_distance(radius, thresh=0.0):
+def test_thresh_and_radius_to_distance(radius, thresh=0.5):
     ret = jnp_util.thresh_and_radius_to_distance(radius, thresh)
     ground_truth = thresh_and_radius_to_distance(radius, thresh)
     assert jnp.allclose(ret, ground_truth)

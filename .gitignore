@@ -6,6 +6,8 @@ __pycache__/
 # C extensions
 *.so
 
+ldif/
+
 # Distribution / packaging
 .Python
 build/
@@ -138,3 +140,4 @@ dmypy.json
 cython_debug/
 
 # End of https://mrkandreev.name/snippets/gitignore-generator/#Python
+.DS_Store

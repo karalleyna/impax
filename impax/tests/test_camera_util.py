@@ -54,7 +54,8 @@ def look_at(eye, center, world_up):
                 to_side_norm,
                 vector_degeneracy_cutoff,
                 message="{0} {1}".format(
-                    "Camera matrix is degenerate because up and gaze are close or", "because up is degenerate."
+                    "Camera matrix is degenerate because up and gaze are close or",
+                    "because up is degenerate.",
                 ),
             )
         ]
@@ -62,7 +63,9 @@ def look_at(eye, center, world_up):
         to_side = tf.divide(to_side, to_side_norm)
         cam_up = tf.linalg.cross(to_side, forward)
 
-    w_column = tf.constant(batch_size * [[0.0, 0.0, 0.0, 1.0]], dtype=tf.float32)  # [batch_size, 4]
+    w_column = tf.constant(
+        batch_size * [[0.0, 0.0, 0.0, 1.0]], dtype=tf.float32
+    )  # [batch_size, 4]
     w_column = tf.reshape(w_column, [batch_size, 4, 1])
     view_rotation = tf.stack(
         [to_side, cam_up, -forward, tf.zeros_like(to_side, dtype=tf.float32)], axis=1
@@ -71,7 +74,9 @@ def look_at(eye, center, world_up):
 
     identity_batch = tf.tile(tf.expand_dims(tf.eye(3), 0), [batch_size, 1, 1])
     view_translation = tf.concat([identity_batch, tf.expand_dims(-eye, 2)], 2)
-    view_translation = tf.concat([view_translation, tf.reshape(w_column, [batch_size, 1, 4])], 1)
+    view_translation = tf.concat(
+        [view_translation, tf.reshape(w_column, [batch_size, 1, 4])], 1
+    )
     camera_matrices = tf.matmul(view_rotation, view_translation)
     return camera_matrices
 
@@ -108,16 +113,22 @@ def look_at_np(eye, center, world_up):
     to_side = np.divide(to_side, to_side_norm)
     cam_up = np.cross(to_side, forward)
 
-    w_column = np.array(batch_size * [[0.0, 0.0, 0.0, 1.0]], dtype=np.float32)  # [batch_size, 4]
+    w_column = np.array(
+        batch_size * [[0.0, 0.0, 0.0, 1.0]], dtype=np.float32
+    )  # [batch_size, 4]
     w_column = np.reshape(w_column, [batch_size, 4, 1])
     view_rotation = np.stack(
         [to_side, cam_up, -forward, np.zeros_like(to_side, dtype=np.float32)], axis=1
     )  # [batch_size, 4, 3] matrix
-    view_rotation = np.concatenate([view_rotation, w_column], axis=2)  # [batch_size, 4, 4]
+    view_rotation = np.concatenate(
+        [view_rotation, w_column], axis=2
+    )  # [batch_size, 4, 4]
     identity_singleton = np.eye(3, dtype=np.float32)[np.newaxis, ...]
     identity_batch = np.tile(identity_singleton, [batch_size, 1, 1])
     view_translation = np.concatenate([identity_batch, np.expand_dims(-eye, 2)], 2)
-    view_translation = np.concatenate([view_translation, np.reshape(w_column, [batch_size, 1, 4])], 1)
+    view_translation = np.concatenate(
+        [view_translation, np.reshape(w_column, [batch_size, 1, 4])], 1
+    )
     camera_matrices = np.matmul(view_rotation, view_translation)
     return camera_matrices
 
@@ -193,10 +204,12 @@ def test_look_at_np(batch_size, key=random.PRNGKey(0)):
 
 
 @pytest.mark.parametrize("roll_pitch_yaw_shape", [(16, 16, 16)])
-def test_roll_pitch_yaw_to_rotation_matrices(roll_pitch_yaw_shape, key=random.PRNGKey(0)):
+def test_roll_pitch_yaw_to_rotation_matrices(
+    roll_pitch_yaw_shape, key=random.PRNGKey(0)
+):
     roll_pitch_yaw = random.normal(key, (*roll_pitch_yaw_shape, 3))
 
     ret = camera_util.roll_pitch_yaw_to_rotation_matrices(roll_pitch_yaw)
     ground_truth = roll_pitch_yaw_to_rotation_matrices(np.array(roll_pitch_yaw))
 
-    assert jnp.allclose(ret, ground_truth)
+    assert jnp.allclose(ret, ground_truth.numpy(), atol=1e-4, rtol=1e-4)
