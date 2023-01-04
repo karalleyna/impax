@@ -5,7 +5,11 @@ please see https://github.com/google/ldif/blob/master/ldif/util/line_util.py.
 from jax import random
 import numpy as np
 import tensorflow as tf
-from impax.utils.line_util import line_to_image
+from impax.utils.line_util import (
+    line_to_image,
+    network_line_parameters_to_line,
+    union_of_line_drawings,
+)
 import jax.numpy as jnp
 
 
@@ -157,3 +161,32 @@ def test_line_to_image(key=random.PRNGKey(0)):
     tf_arr = tf.convert_to_tensor(np.array(line_parameters))
     ground_truth = _line_to_image(tf_arr, int(height), int(width))
     assert jnp.allclose(ret, ground_truth.numpy())
+
+
+def test_union_of_line_drawings(key=random.PRNGKey(0)):
+
+    lines = random.uniform(
+        key,
+        shape=(5, 5),
+    )
+
+    ret = union_of_line_drawings(list(lines))
+    ground_truth = _union_of_line_drawings(list(lines))
+
+    assert jnp.allclose(ret, ground_truth.numpy(), atol=1e-4, rtol=1e-4)
+
+
+def test_network_line_parameters_to_line(key=random.PRNGKey(0)):
+    key0, key1 = random.split(key)
+    line_parameters = random.uniform(
+        key0,
+        shape=(1, 5),
+    )
+    height, width = random.randint(key1, shape=(2,), minval=12, maxval=24)
+
+    ret = network_line_parameters_to_line(line_parameters, int(height), int(width))
+    ground_truth = _network_line_parameters_to_line(
+        np.array(line_parameters), int(height), int(width)
+    )
+
+    assert jnp.allclose(ret, ground_truth.numpy(), atol=1e-1, rtol=1e-1)

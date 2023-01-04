@@ -159,7 +159,7 @@ def network_line_parameters_to_line(line_parameters, height, width):
       An image with shape [batch_size, height, width, 1]. Contains a drawing of
       the network's output.
     """
-    rotation, px, py, lx, ly = line_parameters
+    rotation, px, py, lx, ly = line_parameters.T
     px = jnp.minimum(nn.relu(px * width + width / 2), width)  # was leaky relu!
     py = jnp.minimum(nn.relu(py * height + height / 2), height)  # was leaky relu!
     lx = jnp.clip(jnp.abs(lx) * width, a_min=4.0, a_max=width / 3.0)
