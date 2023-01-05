@@ -4,13 +4,10 @@ References:
 https://github.com/google/ldif/blob/master/ldif/util/geom_util_jnp.py
 """
 
-from logging import Logger
-
 import numpy as jnp
 
 from impax.utils import jnp_util
-
-log = Logger()
+from impax.utils.logging_util import log
 
 
 def apply_4x4(arr, m, are_points=True, feature_count=0):
@@ -47,7 +44,7 @@ def batch_apply_4x4(arrs, ms, are_points=True):
     Returns:
       Numpy array with shape [bs, ..., 3].
     """
-    log.info("Ijnput shapes to batch_apply_4x4: %s and %s" % (repr(arrs.shape), repr(ms.shape)))
+    log("Input shapes to batch_apply_4x4: %s and %s" % (repr(arrs.shape), repr(ms.shape)))
     bs = arrs.shape[0]
     assert ms.shape[0] == bs
     assert len(ms.shape) == 3
