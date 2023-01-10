@@ -20,7 +20,7 @@ import tensorflow.contrib.layers as contrib_layers
 
 # LDIF is an internal package, should be imported last.
 # pylint: disable=g-bad-import-order
-from ldif.util.file_util import log
+from impax.utils.file_util import log
 # pylint: enable=g-bad-import-order
 
 

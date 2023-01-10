@@ -17,14 +17,11 @@
 import importlib
 import tensorflow as tf
 
-import jax
-import jax.numpy as jnp
-
 # LDIF is an internal package, should be imported last.
 # pylint: disable=g-bad-import-order
-from impax.utils import geom_util_jnp
-from impax.utils import jnp_util
-from impax.utils import tf_util
+from ldif.util import geom_util
+from ldif.util import np_util
+from ldif.util import tf_util
 # pylint: enable=g-bad-import-order
 
 importlib.reload(tf_util)
@@ -41,33 +38,32 @@ def gaps_depth_image_to_cam_image(depth_image, xfov):
     cam_image: Tensor with shape [batch_size, height, width, 3].
   """
   batch_size, height, width = depth_image.get_shape().as_list()[:3]
-  jnp.reshape(depth_image,[batch_size, height, width, 1])
-  #depth_image = tf.ensure_shape(depth_image, [batch_size, height, width, 1])
+  depth_image = tf.ensure_shape(depth_image, [batch_size, height, width, 1])
   if isinstance(xfov, float):
-    xfov = jnp.array([xfov], dtype=jnp.float32)
-    xfov = jnp.tile(xfov, [batch_size])
+    xfov = tf.constant([xfov], dtype=tf.float32)
+    xfov = tf.tile(xfov, [batch_size])
   else:
-    xfov = jnp.reshape(xfov, [batch_size])
+    xfov = tf.reshape(xfov, [batch_size])
 #  if xfov.get_shape().as_list()[0] == 1:
 #    xfov = tf.tile(xfov, [batch_size])
 #  else:
 #    assert xfov.get_shape().as_list()[0] == batch_size
 
-  pixel_coords = jnp_util.make_coordinate_grid(
+  pixel_coords = np_util.make_coordinate_grid(
       height, width, is_screen_space=False, is_homogeneous=False)
   # Values should go from -1 -> 1, not from 0 -> 1:
-  nic_x = jnp_util.batch_np(2 * pixel_coords[:, :, 0:1] - 1.0, batch_size)
-  nic_y = jnp_util.batch_np(2 * pixel_coords[:, :, 1:2] - 1.0, batch_size)
+  nic_x = np_util.batch_np(2 * pixel_coords[:, :, 0:1] - 1.0, batch_size)
+  nic_y = np_util.batch_np(2 * pixel_coords[:, :, 1:2] - 1.0, batch_size)
   nic_d = -depth_image
   aspect = height / float(width)
-  tan_xfov = jnp.tan(xfov)
-  yfov = jnp.atan(aspect * tan_xfov)
-  intrinsics_00 = jnp.reshape(1.0 / tan_xfov, [batch_size, 1, 1, 1])
-  intrinsics_11 = jnp.reshape(1.0 / jnp.tan(yfov), [batch_size, 1, 1, 1])
+  tan_xfov = tf.math.tan(xfov)
+  yfov = tf.math.atan(aspect * tan_xfov)
+  intrinsics_00 = tf.reshape(1.0 / tan_xfov, [batch_size, 1, 1, 1])
+  intrinsics_11 = tf.reshape(1.0 / tf.math.tan(yfov), [batch_size, 1, 1, 1])
   cam_x = nic_x * -nic_d / intrinsics_00
   cam_y = nic_y * nic_d / intrinsics_11
   cam_z = nic_d
-  return jnp.concatenate([cam_x, cam_y, cam_z], axis=3)
+  return tf.concat([cam_x, cam_y, cam_z], axis=3)
 
 
 def gaps_depth_image_to_xyz_image(depth_image, xfov, cam2world, mask=None):
@@ -84,7 +80,7 @@ def gaps_depth_image_to_xyz_image(depth_image, xfov, cam2world, mask=None):
     Tensor with shape [batch_size, height, width, 3].
   """
   cam_images = gaps_depth_image_to_cam_image(depth_image, xfov)
-  xyz_images = geom_util_jnp.apply_4x4(cam_images, cam2world, are_points=True,
+  xyz_images = geom_util.apply_4x4(cam_images, cam2world, are_points=True,
                                    batch_rank=1, sample_rank=2)
   if mask is not None:
     xyz_images = tf_util.zero_by_mask(mask, xyz_images, replace_with=0.0)

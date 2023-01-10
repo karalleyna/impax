@@ -26,8 +26,8 @@ from jax import random
 
 # LDIF is an internal package, should be imported last.
 # pylint: disable=g-bad-import-order
-from ldif.util import geom_util
-from ldif.util.file_util import log
+from impax.utils import geom_util
+from impax.utils.file_util import log
 # pylint: enable=g-bad-import-order
 
 importlib.reload(geom_util)
