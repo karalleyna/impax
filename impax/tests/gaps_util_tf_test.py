@@ -19,9 +19,9 @@ import tensorflow as tf
 
 # LDIF is an internal package, should be imported last.
 # pylint: disable=g-bad-import-order
-from ldif.util import geom_util
-from ldif.util import np_util
-from ldif.util import tf_util
+from impax.utils import geom_util_jnp
+from impax.utils import jnp_util
+from impax.utils import tf_util
 # pylint: enable=g-bad-import-order
 
 importlib.reload(tf_util)

@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import os
 import sys
-from opt_util import *
+from impax.utils.opt_util import *
 
 ldif_root = os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)
 sys.path.append(ldif_root)
