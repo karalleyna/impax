@@ -8,7 +8,7 @@ import os
 import pickle
 import struct
 
-import numpy as np
+import jax.numpy as np
 import pandas as pd
 from PIL import Image
 

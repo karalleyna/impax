@@ -11,13 +11,13 @@ import jax.numpy as jnp
 # global
 import numpy as np
 import pytest
-import tensorflow as tf
+#import tensorflow as tf
 from jax import random
 
 from impax.utils import geom_util_jnp
 # ldif is an internal package, should be imported last.
 # pylint: disable=g-bad-import-order
-from ldif.ldif.util import geom_util_np
+#from ldif.ldif.util import geom_util_np
 
 # pylint: enable=g-bad-import-order
 
@@ -38,7 +38,7 @@ def test_apply_4x4(feature_count, are_points, key=random.PRNGKey(0)):
     m = random.normal(key1, shape=(4, 4))
 
     ret = geom_util_jnp.apply_4x4(arr, m, are_points, feature_count)
-    ground_truth = geom_util_np.apply_4x4(arr, m, are_points, feature_count)
+    ground_truth = geom_util_jnp.apply_4x4(arr, m, are_points, feature_count)
 
     assert jnp.allclose(ret, ground_truth, atol=1e-4, rtol=1e-4)
 
@@ -52,6 +52,6 @@ def test_batch_apply_4x4(batch_size, are_points, key=random.PRNGKey(0)):
     ms = random.normal(key1, shape=(batch_size, 4, 4))
 
     ret = geom_util_jnp.batch_apply_4x4(arrs, ms, are_points)
-    ground_truth = geom_util_np.batch_apply_4x4(arrs, ms, are_points)
+    ground_truth = geom_util_jnp.batch_apply_4x4(arrs, ms, are_points)
 
     assert jnp.allclose(ret, ground_truth, atol=1e-4, rtol=1e-4)
