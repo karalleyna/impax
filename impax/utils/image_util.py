@@ -17,13 +17,10 @@
 import io
 import os
 
-import numpy as np
+import jax.numpy as np
 from PIL import Image as PilImage
 import six
 import tensorflow as tf
-
-import jax 
-import jax.numpy as jnp
 
 
 def rgba_to_rgb(model_config, rgba):
@@ -37,9 +34,9 @@ def rgba_to_rgb(model_config, rgba):
   Returns:
     A tensor with shape [..., 3].
   """
-  channel_count = jnp.shape(rgba).as_list()[-1]
+  channel_count = rgba.get_shape().as_list()[-1]
   assert channel_count == 4
-  assert rgba.dtype == jnp.float32
+  assert rgba.dtype == tf.float32
 
   a = rgba[..., 3:4]
   bgcs = model_config.hparams.bg[0]
@@ -52,7 +49,7 @@ def rgba_to_rgb(model_config, rgba):
   elif bgcs == 'b':
     rgb = rgba[..., :3]
   else:  # White, not smooth:
-    rgb = jnp.where(a.astype(dtype=jnp.bool_), rgba[..., :3], 1.0)
+    rgb = tf.where(tf.cast(a, dtype=tf.bool), rgba[..., :3], 1.0)
   return rgb
 
 
@@ -71,7 +68,7 @@ def downsample(images, exp=1):
     Tensor with shape [..., height / 2^exp, width / 2^exp, channel_count].
   """
   for _ in range(exp):
-    images = sum([
+    images = tf.add_n([
         images[..., 0::2, 0::2, :], images[..., 0::2, 1::2, :],
         images[..., 1::2, 0::2, :], images[..., 1::2, 1::2, :]
     ]) / 4
@@ -82,41 +79,38 @@ def get_border_pixels(gt, threshold=0.1):
   """Returns a mask indicating whether each pixel is on the shape's border."""
   outside_pixels = gt >= threshold
   inside_pixels = gt <= -threshold
-  border_pixels = jnp.logical_not(jnp.logical_or(outside_pixels, inside_pixels))
+  border_pixels = tf.logical_not(tf.logical_or(outside_pixels, inside_pixels))
   return border_pixels
 
 
 def hessian(sdf_im):
   """Computes the hessian matrix of a 2D distance function image."""
   batch_size, height, width = [sdf_im.shape[i].value for i in range(3)]
-  sdf_im = jnp.reshape(sdf_im, [batch_size, height, width, 1])
+  sdf_im = tf.reshape(sdf_im, [batch_size, height, width, 1])
   # pyformat: disable
-  xx_fda_kernel = jnp.reshape(
-      jnp.array([[0.0, 0.0, 0.0],
+  xx_fda_kernel = tf.reshape(
+      tf.constant([[0.0, 0.0, 0.0],
                    [1.0, -2.0, 1.0],
-                   [0.0, 0.0, 0.0]], dtype=jnp.float32), [3, 3, 1, 1])
-  yy_fda_kernel = jnp.reshape(
-      jnp.array([[0.0, 1.0, 0.0],
+                   [0.0, 0.0, 0.0]], dtype=tf.float32), [3, 3, 1, 1])
+  yy_fda_kernel = tf.reshape(
+      tf.constant([[0.0, 1.0, 0.0],
                    [0.0, -2.0, 0.0],
-                   [0.0, 1.0, 0.0]], dtype=jnp.float32), [3, 3, 1, 1])
-  xy_fda_kernel = jnp.reshape(
-      jnp.array([[0.25, 0.0, -0.25],
+                   [0.0, 1.0, 0.0]], dtype=tf.float32), [3, 3, 1, 1])
+  xy_fda_kernel = tf.reshape(
+      tf.constant([[0.25, 0.0, -0.25],
                    [0.0, 0.0, 0.0],
-                   [-0.25, 0.0, 0.25]], dtype=jnp.float32), [3, 3, 1, 1])
+                   [-0.25, 0.0, 0.25]], dtype=tf.float32), [3, 3, 1, 1])
   # pyformat: enable
-  fda_kernel = jnp.concatenate(
+  fda_kernel = tf.concat(
       [xx_fda_kernel, xy_fda_kernel, xy_fda_kernel, yy_fda_kernel], axis=3)
-  fda = jax.lax.conv_general_dilated(sdf_im, fda_kernel, window_strides=[1, 1, 1, 1], 
-    padding='SAME', dimension_numbers=None)
+  fda = tf.nn.conv2d(sdf_im, fda_kernel, [1, 1, 1, 1], padding='SAME')
   # Fda should have shape [batch_size, height, width, 4], because we duplicated
   # the xy partial channels.
-  hess = jnp.reshape(fda, [batch_size, height, width, 2, 2])
+  hess = tf.reshape(fda, [batch_size, height, width, 2, 2])
   # Because we used an fda method, we don't have to symmetrize, so just return:
   return hess
 
-# not referenced anywhere, skip
-# could not find a describe/summary function in jax
-"""
+
 def summarize_image(gt, pred, name):
   thresholded_pred = tf.cast(pred > 0.0, dtype=tf.uint8) * 255
   thresholded_gt = tf.cast(gt > 0.0, dtype=tf.uint8) * 255
@@ -125,7 +119,7 @@ def summarize_image(gt, pred, name):
       'thresholded-%s' % name,
       tf.concat([thresholded_gt, thresholded_pred], axis=2),
       max_outputs=10)
-"""
+
 
 def get_pil_formatted_image(image):
   """Converts the output of a mesh_renderer call to a numpy array for PIL.
@@ -141,10 +135,10 @@ def get_pil_formatted_image(image):
   if channel_count != 1:
     raise ValueError('Single-channel input image was expected (dim 2), but '
                      'input has shape %s' % (str(image.shape)))
-  image = jnp.tile(image, [1, 1, 3])
-  alpha = jnp.ones([height, width, 1], dtype=jnp.float32)
-  image = jnp.concatenate([image, alpha], axis=2)
-  out = jnp.clip(255.0 * image, 0.0, 255.0).astype(jnp.uint8).copy(order='C')
+  image = np.tile(image, [1, 1, 3])
+  alpha = np.ones([height, width, 1], dtype=np.float32)
+  image = np.concatenate([image, alpha], axis=2)
+  out = np.clip(255.0 * image, 0.0, 255.0).astype(np.uint8).copy(order='C')
   if out.shape[0] != height or out.shape[1] != width or out.shape[2] != 4:
     raise AssertionError(
         'Internal error: output shape should be (%i, %i, 4) but '
@@ -180,18 +174,18 @@ def images_are_near(baseline_image,
   """
   if baseline_image.shape != result_image.shape:
     return False, ('Image shapes %s and %s do not match' %
-                   (jnp.array_str(jnp.array(baseline_image.shape)),
-                    jnp.array_str(jnp.array(result_image.shape))))
+                   (np.array_str(np.array(baseline_image.shape)),
+                    np.array_str(np.array(result_image.shape))))
 
   float_base = baseline_image.astype(float) / 255.0
   float_result = result_image.astype(float) / 255.0
 
-  outlier_channels = jnp.abs(float_base - float_result) > pixel_error_threshold
+  outlier_channels = np.abs(float_base - float_result) > pixel_error_threshold
   if len(baseline_image.shape) > 2:
-    outlier_pixels = jnp.any(outlier_channels, axis=2)
+    outlier_pixels = np.any(outlier_channels, axis=2)
   else:
     outlier_pixels = outlier_channels
-  outlier_fraction = jnp.count_nonzero(outlier_pixels) / jnp.prod(
+  outlier_fraction = np.count_nonzero(outlier_pixels) / np.prod(
       baseline_image.shape[:2])
   images_match = outlier_fraction <= max_outlier_fraction
   message = (' (%f of pixels are outliers, maximum allowed is %f) ' %
@@ -286,7 +280,7 @@ def expect_image_file_and_image_are_near(test,
       the baseline image, or None.
   """
   try:
-    result_image = jnp.array(
+    result_image = np.array(
         PilImage.open(io.BytesIO(result_image_bytes_or_numpy)))
   except IOError:
     result_image = result_image_bytes_or_numpy
@@ -296,7 +290,7 @@ def expect_image_file_and_image_are_near(test,
   if resize_baseline_image:
     baseline_pil_image = baseline_pil_image.resize(resize_baseline_image,
                                                    PilImage.ANTIALIAS)
-  baseline_image = jnp.array(baseline_pil_image)
+  baseline_image = np.array(baseline_pil_image)
 
   expect_images_are_near_and_save_comparison(test, baseline_image, result_image,
                                              comparison_name,
