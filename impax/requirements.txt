@@ -7,3 +7,5 @@ matplotlib
 trimesh
 pandas
 apache-beam
+flax
+tensorflow-datasets
