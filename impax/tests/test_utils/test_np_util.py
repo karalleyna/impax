@@ -1,5 +1,6 @@
 """
-Checks whether or not the original function implementation and ours return the same values.
+Checks whether or not the original function implementation and
+ours return the same values.
 
 References:
 https://github.com/google/ldif/blob/master/ldif/util/np_util.py 
@@ -31,14 +32,21 @@ def make_coordinate_grid(height, width, is_screen_space, is_homogeneous):
         if not is_screen_space:
             x_coords /= width
             y_coords /= height
-        grid_x, grid_y = np.meshgrid(x_coords, y_coords, sparse=False, indexing="xy")
+        grid_x, grid_y = np.meshgrid(x_coords,
+                                     y_coords,
+                                     sparse=False,
+                                     indexing="xy")
         if is_homogeneous:
             homogeneous_coords = np.ones_like(grid_x)
             return np.stack([grid_x, grid_y, homogeneous_coords], axis=2)
         return np.stack([grid_x, grid_y], axis=2)
 
 
-def make_coordinate_grid_3d(length, height, width, is_screen_space, is_homogeneous):
+def make_coordinate_grid_3d(length,
+                            height,
+                            width,
+                            is_screen_space,
+                            is_homogeneous):
     x_coords = np.linspace(0.5, width - 0.5, width)
     y_coords = np.linspace(0.5, height - 0.5, height)
     z_coords = np.linspace(0.5, length - 0.5, length)
@@ -90,12 +98,19 @@ def thresh_and_radius_to_distance(radius, thresh):
     return np.sqrt(-2.0 * radius * np.log(thresh))
 
 
-def sample_surface(quadrics, centers, radii, length, height, width, renormalize):
+def sample_surface(quadrics,
+                   centers,
+                   radii,
+                   length,
+                   height,
+                   width,
+                   renormalize):
     quadric_count = quadrics.shape[0]
     homogeneous_coords = make_coordinate_grid_3d(
         length, height, width, is_screen_space=False, is_homogeneous=True
     )
-    homogeneous_coords = np.reshape(homogeneous_coords, [length, height, width, 4])
+    homogeneous_coords = np.reshape(homogeneous_coords,
+                                    [length, height, width, 4])
     homogeneous_coords[:, :, :, :3] -= 0.5
     flat_coords = np.reshape(homogeneous_coords, [length * height * width, 4])
 
@@ -142,8 +157,14 @@ def test_batch_np(batch_size, key=random.PRNGKey(0)):
 @pytest.mark.parametrize("is_screen_space", [True, False])
 @pytest.mark.parametrize("is_homogeneous", [True, False])
 def test_make_coordinate_grid(height, width, is_screen_space, is_homogeneous):
-    ret = jnp_util.make_coordinate_grid(height, width, is_screen_space, is_homogeneous)
-    ground_truth = make_coordinate_grid(height, width, is_screen_space, is_homogeneous)
+    ret = jnp_util.make_coordinate_grid(height,
+                                        width,
+                                        is_screen_space,
+                                        is_homogeneous)
+    ground_truth = make_coordinate_grid(height,
+                                        width,
+                                        is_screen_space,
+                                        is_homogeneous)
     assert jnp.allclose(ret, ground_truth)
 
 
@@ -168,7 +189,10 @@ def test_make_coordinate_grid_3d(
 @pytest.mark.parametrize("vals_shape", [(8, 1)])
 def test_filter_valid(mask_shape, vals_shape, key=random.PRNGKey(0)):
     key0, key1 = random.split(key)
-    mask = random.randint(key0, shape=mask_shape, minval=0, maxval=2).astype(bool)
+    mask = random.randint(key0,
+                          shape=mask_shape,
+                          minval=0,
+                          maxval=2).astype(bool)
     vals = random.normal(key1, shape=vals_shape)
     ret = jnp_util.filter_valid(mask, vals)
     ground_truth = filter_valid(np.array(mask), np.array(vals))
@@ -177,9 +201,15 @@ def test_filter_valid(mask_shape, vals_shape, key=random.PRNGKey(0)):
 
 @pytest.mark.parametrize("mask_shape", [(8,), (8, 1)])
 @pytest.mark.parametrize("vals_shape", [(8, 3)])
-def test_zero_by_mask(mask_shape, vals_shape, replace_with=0.0, key=random.PRNGKey(0)):
+def test_zero_by_mask(mask_shape,
+                      vals_shape,
+                      replace_with=0.0,
+                      key=random.PRNGKey(0)):
     key0, key1 = random.split(key)
-    mask = random.randint(key0, shape=mask_shape, minval=0, maxval=2).astype(bool)
+    mask = random.randint(key0,
+                          shape=mask_shape,
+                          minval=0,
+                          maxval=2).astype(bool)
     vals = random.normal(key1, shape=vals_shape)
     ret = jnp_util.zero_by_mask(mask, vals, replace_with)
     ground_truth = zero_by_mask(np.array(mask), np.array(vals), replace_with)
