@@ -9,3 +9,4 @@ pandas
 apache-beam
 flax
 tensorflow-datasets
+ml-collections
