@@ -14,9 +14,7 @@
 # Lint as: python3
 """Utilties for working with sdf and pseudo-sdf functions."""
 
-#import tensorflow as tf
-import jax
-import jax.numpy as jnp
+import tensorflow as tf
 
 
 def apply_class_transfer(sdf, model_config, soft_transfer, offset, dtype=None):
@@ -43,18 +41,18 @@ def apply_class_transfer(sdf, model_config, soft_transfer, offset, dtype=None):
     sdf -= offset
   if soft_transfer:
     if model_config.hparams.lhdn == 't':
-      #with tf.variable_scope('lhdn', reuse=tf.AUTO_REUSE):
-      #  tf.logging.info('Getting hdn variable in scope %s',
-      #                  tf.get_variable_scope().name)
-      init_value = [model_config.hparams.hdn]
-      hdn = init_value #tf.get_variable(
-            #'hdn', dtype=tf.float32, initializer=init_value, trainable=True)
+      with tf.variable_scope('lhdn', reuse=tf.AUTO_REUSE):
+        tf.logging.info('Getting hdn variable in scope %s',
+                        tf.get_variable_scope().name)
+        init_value = tf.constant([model_config.hparams.hdn], dtype=tf.float32)
+        hdn = tf.get_variable(
+            'hdn', dtype=tf.float32, initializer=init_value, trainable=True)
     else:
       hdn = model_config.hparams.hdn
-    return jax.nn.sigmoid(hdn * sdf)
+    return tf.sigmoid(hdn * sdf)
   else:
-    if dtype is None or dtype == float:
-      return jax.lax.convert_element_type(sdf > 0.0, float)  #tf.cast(sdf > 0.0, dtype=tf.float32)
+    if dtype is None or dtype == tf.float32:
+      return tf.cast(sdf > 0.0, dtype=tf.float32)
     else:
       return sdf > 0.0
 
@@ -75,4 +73,4 @@ def apply_density_transfer(sdf):
   # TODO(kgenova) This is one of the simplest possible transfer functions,
   # but is it the right one? Falloff rate should be controlled, and a 'signed'
   # density might even be relevant.
-  return jnp.exp(-jnp.abs(sdf))
+  return tf.exp(-tf.abs(sdf))

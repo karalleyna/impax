@@ -11,13 +11,13 @@ def get_path_to_ldif_root():
     """Finds the LDIF root directory by assuming the script is at the root."""
     expected_util = os.path.dirname(os.path.abspath(__file__))
     # Sanity check that the script lives in the root directory:
-    if expected_util.split("/")[-1] != "util":
+    if expected_util.split("/")[-1] != "utils":
         raise ValueError(
             "Error: Script is not located in the LDIF package util folder, or the"
             f" util folder been renamed. Detected {os.path.abspath(__file__)}."
         )
     ldif_root = "/".join(expected_util.split("/")[:-1])
-    if ldif_root.split("/")[-1] != "ldif":
+    if ldif_root.split("/")[-1] != "impax":
         raise ValueError(
             "Error: Util folder is no longer located in the LDIF root. Please"
             " update util/path_util.py"
@@ -44,7 +44,7 @@ def test_data_path():
 
 
 def util_test_data_path():
-    return package_to_abs("util/test_data/")
+    return package_to_abs("tests/test_data/")
 
 
 def create_test_output_dir():

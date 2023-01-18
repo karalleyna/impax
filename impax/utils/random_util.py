@@ -20,110 +20,94 @@ import math
 import numpy as np
 import tensorflow as tf
 
-import jax
-import jax.numpy as jnp
-from jax import random
-
 # LDIF is an internal package, should be imported last.
 # pylint: disable=g-bad-import-order
-from impax.utils import geom_util
 from impax.utils.file_util import log
 # pylint: enable=g-bad-import-order
 
-importlib.reload(geom_util)
 
 
 def random_shuffle_along_dim(tensor, dim):
   """Randomly shuffles the elements of 'tensor' along axis with index 'dim'."""
   if dim == 0:
-    # some random key
-    key = random.PRNGKey(8484848)
-    return random.shuffle(key, tensor) #.random_shuffle(tensor)
-  tensor_rank = len(jnp.shape(tensor).as_list())
+    return tf.random.shuffle(tensor)
+  tensor_rank = len(tensor.get_shape().as_list())
   perm = list(range(tensor_rank))
   perm[dim], perm[0] = perm[0], perm[dim]
-  tensor = jnp.transpose(tensor, perm=perm)
-  key = random.PRNGKey(8484849)
-  tensor = random.shuffle(key, tensor)
-  tensor = jnp.transpose(tensor, perm=perm)
+  tensor = tf.transpose(tensor, perm=perm)
+  tensor = tf.random.shuffle(tensor)
+  tensor = tf.transpose(tensor, perm=perm)
   return tensor
 
 
 def random_pan_rotations(batch_size):
   """Generates random 4x4 panning rotation matrices."""
-  key = random.PRNGKey(8484841)
-  theta = random.uniform(key, shape=[batch_size], minval=0, maxval=2.0 * math.pi)
-  z = jnp.zeros_like(theta)
-  o = jnp.ones_like(theta)
-  ct = jnp.cos(theta)
-  st = jnp.sin(theta)
-  m = jnp.stack([ct, z, st, z, z, o, z, z, -st, z, ct, z, z, z, z, o], axis=-1)
-  return jnp.reshape(m, [batch_size, 4, 4])
+  theta = tf.random.uniform(shape=[batch_size], minval=0, maxval=2.0 * math.pi)
+  z = tf.zeros_like(theta)
+  o = tf.ones_like(theta)
+  ct = tf.math.cos(theta)
+  st = tf.math.sin(theta)
+  m = tf.stack([ct, z, st, z, z, o, z, z, -st, z, ct, z, z, z, z, o], axis=-1)
+  return tf.reshape(m, [batch_size, 4, 4])
 
 
 def random_pan_rotation_np():
-  key = random.PRNGKey(8484842)
-  theta = random.uniform(key, minval=0, maxval=2.0 * np.pi)
-  m = jnp.array([[jnp.cos(theta), 0, jnp.sin(theta), 0], [0, 1, 0, 0],
-                [-jnp.sin(theta), 0, jnp.cos(theta), 0], [0, 0, 0, 1]],
-               dtype=jnp.float32)
+  theta = np.random.uniform(0, 2.0 * np.pi)
+  m = np.array([[np.cos(theta), 0, np.sin(theta), 0], [0, 1, 0, 0],
+                [-np.sin(theta), 0, np.cos(theta), 0], [0, 0, 0, 1]],
+               dtype=np.float32)
   return m
 
 
 def random_rotations(batch_size):
   """Generates uniformly random 3x3 rotation matrices."""
-  key = random.PRNGKey(8484843)
-  theta = random.uniform(key, shape=[batch_size], minval=0, maxval=2.0 * math.pi)
-  key = random.PRNGKey(8484844)
-  phi = tf.random.uniform(key, shape=[batch_size], minval=0, maxval=2.0 * math.pi)
-  key = random.PRNGKey(8484845)
-  z = tf.random.uniform(key, shape=[batch_size], minval=0, maxval=2.0)
+  theta = tf.random.uniform(shape=[batch_size], minval=0, maxval=2.0 * math.pi)
+  phi = tf.random.uniform(shape=[batch_size], minval=0, maxval=2.0 * math.pi)
+  z = tf.random.uniform(shape=[batch_size], minval=0, maxval=2.0)
 
-  r = jnp.sqrt(z + 1e-8)
-  v = jnp.stack([r * jnp.sin(phi), r * jnp.cos(phi),
-                jnp.sqrt(2.0 - z + 1e-8)],
+  r = tf.sqrt(z + 1e-8)
+  v = tf.stack([r * tf.sin(phi), r * tf.cos(phi),
+                tf.sqrt(2.0 - z + 1e-8)],
                axis=-1)
-  st = jnp.sin(theta)
-  ct = jnp.cos(theta)
-  zero = jnp.zeros_like(st)
-  one = jnp.ones_like(st)
-  base_rot = jnp.stack([ct, st, zero, -st, ct, zero, zero, zero, one], axis=-1)
-  base_rot = jnp.reshape(base_rot, [batch_size, 3, 3])
-  v_outer = jnp.matmul(v[:, :, tf.newaxis], v[:, tf.newaxis, :])
-  rotation_3x3 = jnp.matmul(v_outer - jnp.eye(3, batch_shape=[batch_size]),
+  st = tf.sin(theta)
+  ct = tf.cos(theta)
+  zero = tf.zeros_like(st)
+  one = tf.ones_like(st)
+  base_rot = tf.stack([ct, st, zero, -st, ct, zero, zero, zero, one], axis=-1)
+  base_rot = tf.reshape(base_rot, [batch_size, 3, 3])
+  v_outer = tf.matmul(v[:, :, tf.newaxis], v[:, tf.newaxis, :])
+  rotation_3x3 = tf.matmul(v_outer - tf.eye(3, batch_shape=[batch_size]),
                            base_rot)
   return rotation_to_tx(rotation_3x3)
 
 
 def random_rotation_np():
   """Returns a uniformly random SO(3) rotation as a [3,3] numpy array."""
-  key = random.PRNGKey(8484846)
-  vals = random.uniform(key, shape=(3,))
-  theta = vals[0] * 2.0 * jnp.pi
-  phi = vals[1] * 2.0 * jnp.pi
+  vals = np.random.uniform(size=(3,))
+  theta = vals[0] * 2.0 * np.pi
+  phi = vals[1] * 2.0 * np.pi
   z = 2.0 * vals[2]
-  r = jnp.sqrt(z)
-  v = jnp.stack([r * jnp.sin(phi), r * jnp.cos(phi), jnp.sqrt(2.0 * (1 - vals[2]))])
-  st = jnp.sin(theta)
-  ct = jnp.cos(theta)
-  base_rot = jnp.array([[ct, st, 0], [-st, ct, 0], [0, 0, 1]], dtype=jnp.float32)
-  return (jnp.outer(v, v) - jnp.eye(3)).dot(base_rot)
+  r = np.sqrt(z)
+  v = np.stack([r * np.sin(phi), r * np.cos(phi), np.sqrt(2.0 * (1 - vals[2]))])
+  st = np.sin(theta)
+  ct = np.cos(theta)
+  base_rot = np.array([[ct, st, 0], [-st, ct, 0], [0, 0, 1]], dtype=np.float32)
+  return (np.outer(v, v) - np.eye(3)).dot(base_rot)
 
 
 def random_scales(batch_size, minval, maxval):
-  key = random.PRNGKey(8484847)
-  scales = random.uniform(key,
+  scales = tf.random.uniform(
       shape=[batch_size, 3], minval=minval, maxval=maxval)
-  hom_coord = jnp.ones([batch_size, 1], dtype=jnp.float32)
-  scales = jnp.concatenate([scales, hom_coord], axis=1)
-  s = jnp.diag(scales)
-  log.info(jnp.shape(s).as_list())
-  return jnp.diag(scales)
+  hom_coord = tf.ones([batch_size, 1], dtype=tf.float32)
+  scales = tf.concat([scales, hom_coord], axis=1)
+  s = tf.linalg.diag(scales)
+  log.info(s.get_shape().as_list())
+  return tf.linalg.diag(scales)
 
 
 def random_transformation(origin):
-  batch_size = jnp.shape(origin).as_list()[0]
-  assert len(jnp.shape(origin).as_list()) == 2
+  batch_size = origin.get_shape().as_list()[0]
+  assert len(origin.get_shape().as_list()) == 2
   center = translation_to_tx(-origin)
   rotate = random_rotations(batch_size)
   scale = random_scales(batch_size, 1, 4)
@@ -136,7 +120,7 @@ def random_zoom_transformation(origin):
   assert len(origin.get_shape().as_list()) == 2
   center = translation_to_tx(-origin)
   scale = random_scales(batch_size, 3, 3)
-  tx = jnp.matmul(scale, center)
+  tx = tf.matmul(scale, center)
   return tx
 
 
@@ -149,11 +133,11 @@ def translation_to_tx(t):
   Returns:
     Tensor with shape [..., 4, 4].
   """
-  batch_dims = jnp.shape(t).as_list()[:-1]
-  empty_rot = jnp.eye(3, batch_shape=batch_dims)
-  rot = jnp.concatenate([empty_rot, jnp.expand_dims(t, axis=-1)], axis=-1)
-  hom_row = jnp.eye(4, batch_shape=batch_dims)[..., 3:4, :]
-  return jnp.concatenate([rot, hom_row], axis=-2)
+  batch_dims = t.get_shape().as_list()[:-1]
+  empty_rot = tf.eye(3, batch_shape=batch_dims)
+  rot = tf.concat([empty_rot, t[..., tf.newaxis]], axis=-1)
+  hom_row = tf.eye(4, batch_shape=batch_dims)[..., 3:4, :]
+  return tf.concat([rot, hom_row], axis=-2)
 
 
 def rotation_to_tx(rot):
@@ -165,8 +149,8 @@ def rotation_to_tx(rot):
   Returns:
     Tensor with shape [..., 4, 4].
   """
-  batch_dims = jnp.shape(rot).as_list()[:-2]
-  empty_col = jnp.zeros(batch_dims + [3, 1], dtype=jnp.float32)
-  rot = jnp.concatenate([rot, empty_col], axis=-1)
-  hom_row = jnp.eye(4, batch_shape=batch_dims)[..., 3:4, :]
-  return jnp.concatenate([rot, hom_row], axis=-2)
+  batch_dims = rot.get_shape().as_list()[:-2]
+  empty_col = tf.zeros(batch_dims + [3, 1], dtype=tf.float32)
+  rot = tf.concat([rot, empty_col], axis=-1)
+  hom_row = tf.eye(4, batch_shape=batch_dims)[..., 3:4, :]
+  return tf.concat([rot, hom_row], axis=-2)
