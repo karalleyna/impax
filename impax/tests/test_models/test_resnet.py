@@ -14,11 +14,11 @@ from impax.models.resnet_v2 import ResNet50 as ResNet50V2
 
 
 class ResNetTest(parameterized.TestCase):
-    """Test cases for ResNet v1 model definition."""
+    """Test cases for ResNet model definitions."""
 
     @parameterized.product(model=(ResNet50V1, ResNet50V2))
     def test_resnet_v1_model(self, model):
-        """Tests ResNet V1 model definition and output (variables)."""
+        """Tests ResNet model definitions and outputs (variables)."""
         rng = jax.random.PRNGKey(0)
         model_def = model(num_classes=10, dtype=jnp.float32)
         variables = model_def.init(rng, jnp.ones((8, 224, 224, 3), jnp.float32))
@@ -32,7 +32,7 @@ class ResNetTest(parameterized.TestCase):
 
     @parameterized.product(model=(ResNet18V1, ResNet18V2))
     def test_resnet_18_v1_model(self, model):
-        """Tests ResNet18 V1 model definition and output (variables)."""
+        """Tests ResNet18 model definitions and outputs (variables)."""
         rng = jax.random.PRNGKey(0)
         model_def = model(num_classes=2, dtype=jnp.float32)
         variables = model_def.init(rng, jnp.ones((1, 64, 64, 3), jnp.float32))
