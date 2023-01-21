@@ -5,9 +5,6 @@ import jax.numpy as jnp
 
 from impax.utils import math_util, net_util
 
-# pylint: enable=g-bad-import-order
-
-# The epsilon used to pad before taking tf.sqrt(). Set equal to OccNet code.
 SQRT_EPS = 1e-5
 
 
@@ -16,7 +13,8 @@ def ensure_rank(tensor, rank):
     real_rank = len(real_shape)
     if real_rank != rank:
         raise ValueError(
-            "Expected a tensor with rank %i, but given a tensor " "with shape %s" % (real_rank, str(real_shape))
+            "Expected a tensor with rank %i, but given a tensor "
+            "with shape %s" % (real_rank, str(real_shape))
         )
 
 
@@ -28,7 +26,8 @@ def ensure_dims_match(t1, t2, dims):
     for dim in dims:
         if t1_shape[dim] != t2_shape[dim]:
             raise ValueError(
-                "Expected tensors %s and %s to match along dims %s" % (str(t1_shape), str(t2_shape), str(dims))
+                "Expected tensors %s and %s to match along dims %s"
+                % (str(t1_shape), str(t2_shape), str(dims))
             )
 
 
@@ -43,7 +42,10 @@ def ensure_shape(tensor, shape):
             if si != -1 and si != real_shape[dim]:
                 failing = True
     if failing:
-        raise ValueError("Expected tensor with shape %s to have shape %s." % (str(real_shape), str(shape)))
+        raise ValueError(
+            "Expected tensor with shape %s to have shape %s."
+            % (str(real_shape), str(shape))
+        )
 
 
 def dim_needs_broadcasting(a, b):
@@ -157,7 +159,9 @@ class OCCNet(nn.Module):
         beta = self.beta_fc(shape_embedding)
         gamma = self.gamma_fc(shape_embedding)
 
-        batch_mean, batch_variance = jnp.mean(sample_embeddings, axis=(1, 2)), jnp.var(sample_embeddings, axis=(1, 2))
+        batch_mean, batch_variance = jnp.mean(sample_embeddings, axis=(1, 2)), jnp.var(
+            sample_embeddings, axis=(1, 2)
+        )
         ensure_shape(batch_mean, [batch_size])
         reduced_batch_mean = jnp.mean(batch_mean)
         ensure_shape(batch_variance, [batch_size])
@@ -165,7 +169,9 @@ class OCCNet(nn.Module):
         is_training = self.model_config.train
         if is_training:
             self.running_mean = 0.995 * self.running_mean + 0.005 * reduced_batch_mean
-            self.running_variance = 0.995 * self.running_variance + 0.005 * reduced_batch_variance
+            self.running_variance = (
+                0.995 * self.running_variance + 0.005 * reduced_batch_variance
+            )
 
         denom = jnp.sqrt(self.running_variance + SQRT_EPS)
         out = jnp.expand_dims(gamma, axis=1) * jnp.divide(
@@ -191,13 +197,17 @@ class OCCNet(nn.Module):
         # sample_embedding_length = sample_embeddings.shape[1]
         beta = self.beta_fc(shape_embedding[None, ...]).flatten()
         gamma = self.gamma_fc(shape_embedding[None, ...]).flatten()
-        batch_mean, batch_variance = jnp.mean(sample_embeddings, axis=(0, 1)), jnp.var(sample_embeddings, axis=(0, 1))
+        batch_mean, batch_variance = jnp.mean(sample_embeddings, axis=(0, 1)), jnp.var(
+            sample_embeddings, axis=(0, 1)
+        )
         ensure_is_scalar(batch_mean)
         ensure_is_scalar(batch_variance)
         is_training = self.model_config.train
         if is_training:
             self.running_mean = 0.995 * self.running_mean + 0.005 * batch_mean
-            self.running_variance = 0.995 * self.running_variance + 0.005 * batch_variance
+            self.running_variance = (
+                0.995 * self.running_variance + 0.005 * batch_variance
+            )
 
         denom = jnp.sqrt(self.running_variance + SQRT_EPS)
         out = gamma * jnp.divide((sample_embeddings - self.running_mean), denom) + beta
@@ -271,7 +281,9 @@ class OCCNet(nn.Module):
         resnet_layer_count = self.model_config.hparams.orc
         sample_embeddings = self.sample_resize_fc(samples)
         for i in range(resnet_layer_count):
-            sample_embeddings = self.occnet_resnet_layer(embedding, sample_embeddings, self.resnets[i])
+            sample_embeddings = self.occnet_resnet_layer(
+                embedding, sample_embeddings, self.resnets[i]
+            )
         sample_embeddings = self.cbn_layer(embedding, sample_embeddings)
         vals = self.final_act(sample_embeddings)
         if apply_sigmoid:
@@ -296,9 +308,13 @@ class OCCNet(nn.Module):
         batch_size, sample_count = samples.shape[0:2]
         resnet_layer_count = self.model_config.hparams.orc
         sample_embeddings = self.sample_resize_fc(samples)
-        ensure_shape(sample_embeddings, [batch_size, sample_count, self.sample_embedding_length])
+        ensure_shape(
+            sample_embeddings, [batch_size, sample_count, self.sample_embedding_length]
+        )
         for i in range(resnet_layer_count):
-            sample_embeddings = self.batched_occnet_resnet_layer(embedding, sample_embeddings, self.resnets[i])
+            sample_embeddings = self.batched_occnet_resnet_layer(
+                embedding, sample_embeddings, self.resnets[i]
+            )
         sample_embeddings = self.batched_cbn_layer(embedding, sample_embeddings)
         vals = self.final_act(sample_embeddings)
         if apply_sigmoid:
@@ -330,7 +346,9 @@ class OCCNet(nn.Module):
             )
             ensure_shape(embedding, [1, -1])
             ensure_shape(samples, [1, -1, 3])
-            vals = self.one_shape_occnet_decoder(remove_batch_dim(embedding), remove_batch_dim(samples), apply_sigmoid)
+            vals = self.one_shape_occnet_decoder(
+                remove_batch_dim(embedding), remove_batch_dim(samples), apply_sigmoid
+            )
             return add_batch_dim(vals)
         batch_size, embedding_length = embedding.shape
         ensure_shape(embedding, [batch_size, embedding_length])
