@@ -33,8 +33,6 @@ class AffineTransformation(nn.Module):
 class OrthogonalTransformation(nn.Module):
     """A block to learn an orthogonal feature transformation matrix."""
 
-    output_dim: int
-
     @nn.compact
     def __call__(x) -> Any:
         batch_size, point_count, _, input_feature_count = x.shape
@@ -94,7 +92,7 @@ class CNN(nn.Module):
     def __call__(self, x):
 
         for feature in self.features:
-            x = nn.Conv(feature, kernel_size=1, padding="VALID", stride=1)(x)
+            x = nn.Conv(feature, kernel_size=[1, 1], padding="VALID", strides=1)(x)
 
         return x
 
@@ -114,7 +112,7 @@ class PointNet(nn.Module):
         point_features = x[..., 3:].copy()
         feature_count -= 3
         if self.affine_transformation:
-            x = AffineTransformation(x)
+            x = AffineTransformation()(x)
             # transformation
             transformation_bias = jnp.array(
                 [1, 0, 0, 0, 1, 0, 0, 0, 1], dtype=jnp.float32
@@ -134,7 +132,7 @@ class PointNet(nn.Module):
         x = CNN([64, 64])(x)
 
         if self.orthogonal_transformation:
-            x = OrthogonalTransformation(x)
+            x = OrthogonalTransformation()(x)
             transformation = jnp.add(
                 jnp.zeros((*x.shape[:-1], self.output_dim**2), dtype=jnp.float32),
                 jnp.eye(64).flatten().astype(jnp.float32),
@@ -153,6 +151,15 @@ class PointNet(nn.Module):
 
         assert len(x.shape) == 3
 
-        x = jnp.reduce_max(x, axis=1)
-        x = MLP([512, 256, self.output_dim])
+        x = jnp.max(x, axis=1)
+        x = MLP([512, 256, self.output_dim])(x)
         return x
+
+
+if __name__ == "__main__":
+    module = PointNet(2, 2)
+    import jax
+
+    params = module.init(jax.random.PRNGKey(0), jnp.zeros((2, 3, 4)))
+
+    print(module.apply(params, jnp.zeros((2, 3, 4))).shape)
