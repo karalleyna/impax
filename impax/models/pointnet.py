@@ -102,7 +102,7 @@ class PointNet(nn.Module):
 
     output_dim: int
     maxpool_feature_count: int = 1024
-    affine_transformation: bool = False
+    affine_transformation: bool = True
     orthogonal_transformation: bool = False
 
     @nn.compact
