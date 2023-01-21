@@ -154,12 +154,3 @@ class PointNet(nn.Module):
         x = jnp.max(x, axis=1)
         x = MLP([512, 256, self.output_dim])(x)
         return x
-
-
-if __name__ == "__main__":
-    module = PointNet(2, 2)
-    import jax
-
-    params = module.init(jax.random.PRNGKey(0), jnp.zeros((2, 3, 4)))
-
-    print(module.apply(params, jnp.zeros((2, 3, 4))).shape)
