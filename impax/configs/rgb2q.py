@@ -1,3 +1,6 @@
+"""
+Consists of the definition of the hyperparameters of a model.
+"""
 import ml_collections
 
 
@@ -28,7 +31,7 @@ def get_config():
     # It is called fcl in the original repo.
     config.latent_fully_connected_layer_width = 2
     # ??
-    config.ft = "t"
+    config.ft = True
     # How to apply input augmentation: 'f', 't', 'io'
     config.input_augmentation = "f"
     # The encoder architecture. 'rn', 'sr50', 'vl', 'vlp':
@@ -42,8 +45,119 @@ def get_config():
     # 'uniform': Uniform 1.0
     # 'inverse': inverse weighting (basically bad)
     config.distillation_loss_weighting = "relative"
-    # Distillation supervision:
+    # [sv]: Distillation supervision:
     # 'all': All
     # 'implicit': Just implicits
-    # 'e': Just explicits
-    return config
+    # 'explicit': Just explicits
+    config.distillation_supervision = "all"
+
+    # [cnna]: The network architecture of the CNN, if applicable.
+    #  'cnn': A simple cnn with 5 conv layers and 5 FC layers.
+    #  'r18': ResNet18.
+    #  'r50': ResNet50.
+    #  'h50': Tf-hub ImageNet pretrained ResNet50
+    config.cnn_architecture = "r50"
+    # [rc]: The random image count, if random image samples are used.
+    config.random_image_count = 1
+
+    # [bg]: The background
+    # 'b' or 'w' (black/white)
+    # with or without 's' for smooth:
+    config._background = "ws"
+
+    # [dlw]: The distillation loss weight:
+    config.distillation_loss_weight = (1.0,)
+    # [ilw]: The relative weight of implicits within the distillation loss:
+    config.distillation_implicit_weight = (1.0,)
+    # [elw]: The relative weight of explicits within the distillation loss:
+    config.distillation_explicit_weight = (1.0,)
+    # [slw]: The argmax segmentation task loss weight:
+    config.segmentation_loss_weight = (1.0,)
+    # [tlw]: The depth task loss weight:
+    config.depth_loss_weight = (1.0,)
+    # [xlw]: The xyz task loss weight:
+    config.xyz_loss_weight = (1.0,)
+    # [xt]: The set of extra tasks:
+    # 'd': Predict depth
+    # 'x': Predict XYZ
+    # 'a': Predict the argmax image.
+    # 's': Predict a segmentation image.
+    # 'n': Predict a normals image.
+    config.extra_tasks = ("a",)
+    # [wh]: Whether to apply whitening:
+    config.whitening = True
+    # [rlw]: The reconstruction loss weight:
+    config.reconstruction_loss_weight = (1.0,)
+    # [res]: The operating resolution (excluding pretrained networks).
+    config.resolution = (137,)
+    # [dec]: The decoder architecture:
+    config.decoder_architecture = ("dl",)
+    # [et]: Whether to enable tiling to three channels for pretrained input support:
+    config.tiling = False
+    # [im]: The type of image to use for the input:
+    config.image_type = ("rgb",)
+    # [eil: Whether to predict the blobs from the extra prediction.
+    config.extra_prediction = False
+    # [spt]: Whether the secondary encoder is pretrained (if there is one)
+    config.secondary_encoder_enabled = True
+    # [sec]: The secondary encoder architecture.
+    config.secondary_encoder_architecture = ("epr50",)
+    # [txd]: Whether the depth prediction should be transformed to XYZ before being
+    # given to the secondary encoder:
+    config.to_xyz = True
+    # [up]: Whether to use the predicted image 't' or the GT image 'f' in the inline-
+    # encoder:
+    config.use_prediction = True
+    # [rdx]: Whether to apply the depth prediction loss in xyz space:
+    config.depth_prediction_loss = False
+    # [st]: Whether each task gets its own decoder:
+    config.to_decoder = False
+    # [lsg]: What kind of segmentation to do in the loss function:
+    # 'n': None- the loss is applied to the entire image.
+    # 'p': Predicted: The loss is applied where the prediction segments.
+    # 'g': Ground truth: The loss is applied based on the GT segmentation.
+    # 'o': The loss is based on GT == 1.0
+    config.segmentation = ("n",)
+    # [lsn]: What kind of loss to apply for the normals.
+    config.normal_loss_type = ("a",)
+    # [pnf] The predict normal's frame.
+    # False for world('w'  in the original repo)
+    # True for cam('c'  in the original repo)
+    config.cam = True
+    # [nlw]: The normal prediction loss weight.
+    config.normal_loss_weight = (1.0,)
+    # [ni] Whether to add the normals as a secondary input.
+    config.add_secondary_input = False
+    # [nmo]: Whether to *only* input the normals:
+    nmo = False
+    # [dxw]: locals xyz loss weight
+    dxw = (1.0,)
+    # [dnw]: locals normal loss weight
+    dnw = (1.0,)
+    # [drl]: The type of depth regression loss:
+    config.depth_regression_loss_type = ("l2",)
+    # [msg]: What kind of segmentation to do in the depth -> XYZ mapping:
+    # 'd': Do the mapping based on where the predicted depth is nontrivial.
+    # 'p': Do the mapping based on the predicted segmentation mask.
+    # 'g': Do the mapping based on the ground truth segmentation mask.
+    msg = ("p",)
+    # [lpe]: Whether to have a local pointnet encoder. Only works if an xyz
+    # image is available at test time:
+    lpe = ("f",)
+    # [lpn]: Whether to add normals as a feature for the local pointnets.
+    lpn = ("f",)
+    # [lpt]: The threshold (in radii) of the local pointclouds.
+    lpt = (4.0,)
+    # [vf]: Whether to add a point validity one-hot feature to the pointnet.
+    vf = ("f",)
+    # [fod]: Whether to fix the object_detection encoder defaults.
+    fod = ("t",)
+    # [ftd]: Whether to finetune the decoder
+    ftd = ("f",)
+    # # [iz]: Whether to ignore 0s in the local pointnet encoders.
+    # iz='f',
+    lyr = (0,)
+    # Whether to include global scope in the final feature vector.
+    grf = ("f",)
+    # The task identifier, for looking up backwards compatible hparams (below):
+    config.task = "rgb2q"
