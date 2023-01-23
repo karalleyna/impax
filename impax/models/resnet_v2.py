@@ -51,6 +51,7 @@ class BottleneckResNetBlock(nn.Module):
     norm: ModuleDef
     activation: Callable
     strides: Tuple[int, int] = (1, 1)
+    name: str = ""
 
     @nn.compact
     def __call__(self, x):
@@ -69,7 +70,7 @@ class BottleneckResNetBlock(nn.Module):
         y = self.conv(self.filters * 4, (1, 1))(y)
 
         if residual.shape != y.shape:
-            residual = self.conv(self.filters * 4, (1, 1), self.strides, name="conv_proj")(tmp)
+            residual = self.conv(self.filters * 4, (1, 1), self.strides, name=self.name + "conv_proj")(tmp)
 
         return residual + y
 
@@ -79,7 +80,7 @@ class ResNet(nn.Module):
 
     stage_sizes: Sequence[int]
     block_cls: ModuleDef
-    num_classes: int
+    num_classes: int = 1024
     num_filters: int = 64
     dtype: Any = jnp.float32
     activation: Callable = nn.relu
