@@ -38,7 +38,9 @@ class ResNetBlock(nn.Module):
         y = self.conv(self.filters, (3, 3))(y)
 
         if residual.shape != y.shape:
-            residual = self.conv(self.filters, (1, 1), self.strides, name="conv_proj")(tmp)
+            residual = self.conv(self.filters, (1, 1), self.strides, name="conv_proj")(
+                tmp
+            )
 
         return residual + y
 
@@ -70,7 +72,9 @@ class BottleneckResNetBlock(nn.Module):
         y = self.conv(self.filters * 4, (1, 1))(y)
 
         if residual.shape != y.shape:
-            residual = self.conv(self.filters * 4, (1, 1), self.strides, name=self.name + "conv_proj")(tmp)
+            residual = self.conv(
+                self.filters * 4, (1, 1), self.strides, name=self.name + "conv_proj"
+            )(tmp)
 
         return residual + y
 
@@ -79,7 +83,7 @@ class ResNet(nn.Module):
     """ResNetV2."""
 
     stage_sizes: Sequence[int]
-    block_cls: ModuleDef
+    block_cls: ModuleDef = ResNetBlock
     num_classes: int = 1024
     num_filters: int = 64
     dtype: Any = jnp.float32
@@ -97,7 +101,9 @@ class ResNet(nn.Module):
             dtype=self.dtype,
         )
 
-        x = conv(self.num_filters, (7, 7), (2, 2), padding=[(3, 3), (3, 3)], name="conv_init")(x)
+        x = conv(
+            self.num_filters, (7, 7), (2, 2), padding=[(3, 3), (3, 3)], name="conv_init"
+        )(x)
         x = norm(name="bn_init")(x)
         x = nn.relu(x)
         x = nn.max_pool(x, (3, 3), strides=(2, 2), padding="SAME")
@@ -125,9 +131,13 @@ ResNet152 = partial(ResNet, stage_sizes=[3, 8, 36, 3], block_cls=BottleneckResNe
 ResNet200 = partial(ResNet, stage_sizes=[3, 24, 36, 3], block_cls=BottleneckResNetBlock)
 
 
-ResNet18Local = partial(ResNet, stage_sizes=[2, 2, 2, 2], block_cls=ResNetBlock, conv=nn.ConvLocal)
+ResNet18Local = partial(
+    ResNet, stage_sizes=[2, 2, 2, 2], block_cls=ResNetBlock, conv=nn.ConvLocal
+)
 
 
 # Used for testing only.
 _ResNet1 = partial(ResNet, stage_sizes=[1], block_cls=ResNetBlock)
-_ResNet1Local = partial(ResNet, stage_sizes=[1], block_cls=ResNetBlock, conv=nn.ConvLocal)
+_ResNet1Local = partial(
+    ResNet, stage_sizes=[1], block_cls=ResNetBlock, conv=nn.ConvLocal
+)
