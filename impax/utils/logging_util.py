@@ -4,9 +4,6 @@ References:
 https://github.com/google/ldif/blob/master/ldif/util/logging_util.py
 """
 
-from impax.utils.base.log import Log
+from logging import Logger
 
-
-def log(msg, level="info"):
-    Log.log(Log, f"ldif {level.upper()}: {msg}")
-    Log.log(Log, msg, level)
+log = Logger("impax_logger")
