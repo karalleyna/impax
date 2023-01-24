@@ -73,7 +73,7 @@ def get_border_pixels(gt, threshold=0.1):
 
 def hessian(sdf_im):
     """Computes the hessian matrix of a 2D distance function image."""
-    batch_size, height, width = [sdf_im.shape[i].value for i in range(3)]
+    batch_size, height, width = [sdf_im.shape[i] for i in range(3)]
     sdf_im = jnp.reshape(sdf_im, [batch_size, height, width, 1])
     # pyformat: disable
     xx_fda_kernel = jnp.reshape(
