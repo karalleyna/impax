@@ -8,7 +8,9 @@ import jax
 import jax.numpy as jnp
 
 
-def apply_class_transfer(sdf, model_config, soft_transfer, offset, dtype=None):
+def apply_class_transfer(
+    sdf, soft_transfer, offset, sigmoid_normalization: True, hardness=100.0, dtype=None
+):
     """Applies a class label transformation to an input sdf.
     Args:
       sdf: Tensor of any shape. The sdfs to transform elementwise.
@@ -29,16 +31,11 @@ def apply_class_transfer(sdf, model_config, soft_transfer, offset, dtype=None):
     if offset:
         sdf -= offset
     if soft_transfer:
-        if model_config.hparams.lhdn == "t":
-            # with tf.variable_scope('lhdn', reuse=tf.AUTO_REUSE):
-            #  tf.logging.info('Getting hdn variable in scope %s',
-            #                  tf.get_variable_scope().name)
-            init_value = [model_config.hparams.hdn]
-            hdn = init_value  # tf.get_variable(
-            #'hdn', dtype=tf.float32, initializer=init_value, trainable=True)
+        if sigmoid_normalization:
+            hardness = [hardness]
         else:
-            hdn = model_config.hparams.hdn
-        return jax.nn.sigmoid(hdn * sdf)
+            hardness = hardness
+        return jax.nn.sigmoid(hardness * sdf)
     else:
         if dtype is None or dtype == float:
             return jax.lax.convert_element_type(
