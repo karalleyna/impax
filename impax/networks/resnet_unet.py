@@ -4,7 +4,7 @@ import flax.linen as nn
 import jax
 import jax.numpy as jnp
 
-from impax.models.resnet_v2 import BottleneckResNetBlock, ResNet50
+from impax.networks.resnet_v2 import BottleneckResNetBlock, ResNet50
 
 
 def fixed_padding(inputs, kernel_size, data_format):

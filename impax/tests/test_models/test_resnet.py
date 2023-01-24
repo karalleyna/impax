@@ -6,11 +6,11 @@ from absl.testing import parameterized
 import jax
 from jax import numpy as jnp
 
-from impax.models.resnet_v1 import ResNet18 as ResNet18V1
-from impax.models.resnet_v2 import ResNet18 as ResNet18V2
+from impax.networks.resnet_v1 import ResNet18 as ResNet18V1
+from impax.networks.resnet_v2 import ResNet18 as ResNet18V2
 
-from impax.models.resnet_v1 import ResNet50 as ResNet50V1
-from impax.models.resnet_v2 import ResNet50 as ResNet50V2
+from impax.networks.resnet_v1 import ResNet50 as ResNet50V1
+from impax.networks.resnet_v2 import ResNet50 as ResNet50V2
 
 
 class ResNetTest(parameterized.TestCase):

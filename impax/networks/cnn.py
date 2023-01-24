@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 # local
 from impax.utils.logging_util import log
-from impax.models.resnet_v2 import ResNet
+from impax.networks.resnet_v2 import ResNet
 from impax.utils.model_utils import Encoder
 
 
