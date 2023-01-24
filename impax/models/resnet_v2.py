@@ -51,7 +51,7 @@ class BottleneckResNetBlock(nn.Module):
     filters: int
     conv: ModuleDef
     norm: ModuleDef
-    activation: Callable
+    activation: Callable = nn.relu
     strides: Tuple[int, int] = (1, 1)
     name: str = ""
 
@@ -89,6 +89,7 @@ class ResNet(nn.Module):
     dtype: Any = jnp.float32
     activation: Callable = nn.relu
     conv: ModuleDef = nn.Conv
+    return_intermediates: bool = True
 
     @nn.compact
     def __call__(self, x, train: bool = True):
@@ -100,6 +101,7 @@ class ResNet(nn.Module):
             epsilon=1e-5,
             dtype=self.dtype,
         )
+        intermediates = []
 
         x = conv(
             self.num_filters, (7, 7), (2, 2), padding=[(3, 3), (3, 3)], name="conv_init"
@@ -117,9 +119,13 @@ class ResNet(nn.Module):
                     norm=norm,
                     activation=self.activation,
                 )(x)
+            intermediates.append(x)
         x = jnp.mean(x, axis=(1, 2))
         x = nn.Dense(self.num_classes, dtype=self.dtype)(x)
         x = jnp.asarray(x, self.dtype)
+
+        if self.return_intermediates:
+            return x, intermediates
         return x
 
 

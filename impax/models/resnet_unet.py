@@ -1,3 +1,5 @@
+from functools import partial
+
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
@@ -50,7 +52,7 @@ class ResnetUnet(nn.Module):
     param_count: int = 1024
 
     @nn.compact
-    def __call__(self, x):
+    def __call__(self, x, train: bool = True):
         assert len(x.shape) == 4
         batch_size, input_height, input_width, feature_count = x.shape
 
@@ -58,7 +60,7 @@ class ResnetUnet(nn.Module):
             inputs = jax.image.resize(x, (batch_size, 224, 224, feature_count), method="nearest", antialias=True)
 
         data_format = "channels_last"
-        model = ResNet50()
+        model = ResNet50(return_intermediates=True)
 
         if data_format == "channels_first":
             fullres_in = jnp.transpose(inputs, axes=[0, 3, 1, 2])
@@ -81,10 +83,10 @@ class ResnetUnet(nn.Module):
         input_at_28x28 = resize(fullres_in, 28, 28, data_format)
         input_at_56x56 = resize(fullres_in, 56, 56, data_format)
 
-        skip_from_7x7 = intermediate_outputs["post_block_3"]
-        skip_from_14x14 = intermediate_outputs["post_block_2"]
-        skip_from_28x28 = intermediate_outputs["post_block_1"]
-        skip_from_56x56 = intermediate_outputs["post_block_0"]
+        skip_from_7x7 = intermediate_outputs[3]
+        skip_from_14x14 = intermediate_outputs[2]
+        skip_from_28x28 = intermediate_outputs[1]
+        skip_from_56x56 = intermediate_outputs[0]
 
         if data_format == "channels_first":
             assert skip_from_7x7.shape == (batch_size, 2048, 7, 7)
@@ -102,8 +104,16 @@ class ResnetUnet(nn.Module):
         if data_format == "channels_first":
             features_4x4 = jnp.transpose(features_4x4, axes=[0, 3, 1, 2])
 
+        conv = partial(nn.Conv, use_bias=False)
+        norm = partial(
+            nn.BatchNorm,
+            use_running_average=not train,
+            momentum=0.9,
+            epsilon=1e-5,
+        )
+
         for i in range(3):
-            features_4x4 = BottleneckResNetBlock(1024, name=f"up_block_layer_4x4_{i}")(features_4x4)
+            features_4x4 = BottleneckResNetBlock(1024, conv, norm, name=f"up_block_layer_4x4_{i}")(features_4x4)
 
         output_4x4 = nn.Conv(self.param_count, kernel_size=(1, 1), strides=1)(
             fixed_padding(features_4x4, kernel_size=1, data_format=data_format)
@@ -117,12 +127,12 @@ class ResnetUnet(nn.Module):
         # Move up to 7x7:
         output_4x4_at_7x7 = resize(output_4x4, 7, 7, data_format)
         features_4x4_at_7x7 = resize(features_4x4, 7, 7, data_format)
-        features_7x7 = jnp.concat(
+        features_7x7 = jnp.concatenate(
             [output_4x4_at_7x7, input_at_7x7, features_4x4_at_7x7, skip_from_7x7], axis=feature_axis
         )
 
         for i in range(3):
-            features_7x7 = BottleneckResNetBlock(512, name=f"up_block_layer_7x7_{i}")(features_7x7)
+            features_7x7 = BottleneckResNetBlock(512, conv, norm, name=f"up_block_layer_7x7_{i}")(features_7x7)
 
         output_7x7 = nn.Conv(self.param_count, kernel_size=(1, 1), strides=1)(
             fixed_padding(features_7x7, kernel_size=1, data_format=data_format)
@@ -131,12 +141,12 @@ class ResnetUnet(nn.Module):
         # Move up to 14x14:
         output_7x7_at_14x14 = resize(output_7x7, 14, 14, data_format)
         features_7x7_at_14x14 = resize(features_7x7, 14, 14, data_format)
-        features_14x14 = jnp.concat(
+        features_14x14 = jnp.concatenate(
             [output_7x7_at_14x14, input_at_14x14, features_7x7_at_14x14, skip_from_14x14], axis=feature_axis
         )
 
         for i in range(3):
-            features_14x14 = BottleneckResNetBlock(256, name=f"up_block_layer_14x14_{i}")(features_14x14)
+            features_14x14 = BottleneckResNetBlock(256, conv, norm, name=f"up_block_layer_14x14_{i}")(features_14x14)
 
         output_14x14 = nn.Conv(self.param_count, kernel_size=(1, 1), strides=1)(
             fixed_padding(features_14x14, kernel_size=1, data_format=data_format)
@@ -145,12 +155,12 @@ class ResnetUnet(nn.Module):
         # Move up to 28x28
         output_14x14_at_28x28 = resize(output_14x14, 28, 28, data_format)
         features_14x14_at_28x28 = resize(features_14x14, 28, 28, data_format)
-        features_28x28 = jnp.concat(
+        features_28x28 = jnp.concatenate(
             [output_14x14_at_28x28, input_at_28x28, features_14x14_at_28x28, skip_from_28x28], axis=feature_axis
         )
 
         for i in range(3):
-            features_28x28 = BottleneckResNetBlock(256, name=f"up_block_layer_28x28_{i}")(features_28x28)
+            features_28x28 = BottleneckResNetBlock(256, conv, norm, name=f"up_block_layer_28x28_{i}")(features_28x28)
 
         output_28x28 = nn.Conv(self.param_count, kernel_size=(1, 1), strides=1)(
             fixed_padding(features_28x28, kernel_size=1, data_format=data_format)
@@ -159,12 +169,12 @@ class ResnetUnet(nn.Module):
         # Move up to 56x56 (finally):
         output_28x28_at_56x56 = resize(output_28x28, 56, 56, data_format)
         features_28x28_at_56x56 = resize(features_28x28, 56, 56, data_format)
-        features_56x56 = jnp.concat(
+        features_56x56 = jnp.concatenate(
             [output_28x28_at_56x56, input_at_56x56, features_28x28_at_56x56, skip_from_56x56], axis=feature_axis
         )
 
         for i in range(3):
-            features_56x56 = BottleneckResNetBlock(128, name=f"up_block_layer_28x28_{i}")(features_56x56)
+            features_56x56 = BottleneckResNetBlock(128, conv, norm, name=f"up_block_layer_56x56_{i}")(features_56x56)
 
         output_56x56 = nn.Conv(self.param_count, kernel_size=(1, 1), strides=1)(
             fixed_padding(features_56x56, kernel_size=1, data_format=data_format)
@@ -194,3 +204,13 @@ class ResnetUnet(nn.Module):
             flat_out_56x56 = jnp.reshape(output_56x56, [batch_size, 56 * 56, self.param_count])
 
         return [flat_out_4x4, flat_out_7x7, flat_out_14x14, flat_out_28x28, flat_out_56x56]
+
+
+if __name__ == "__main__":
+    renset = ResnetUnet(flat_predict=False)
+
+    vars = renset.init(jax.random.PRNGKey(0), jnp.ones((32, 64, 64, 3)))
+
+    output, vars = renset.apply(vars, jnp.ones((32, 64, 64, 3)), mutable=["batch_stats"])
+    for elem in output:
+        print(elem.shape)
