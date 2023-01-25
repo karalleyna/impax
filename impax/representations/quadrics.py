@@ -1,5 +1,6 @@
 """Utilities to evaluate quadric implicit surface functions."""
 import jax.numpy as jnp
+from jax import vmap
 from impax.utils import camera_util
 from impax.utils import jax_util
 
@@ -34,23 +35,29 @@ def sample_quadric_surface(quadric, center, samples):
     samples = samples - jnp.expand_dims(center, axis=batching_rank)
     sample_count = samples.shape[-2]
 
-    homogeneous_sample_ones = jnp.ones(samples.shape[:-1] + [1], dtype=jnp.float32)
-    homogeneous_sample_coords = jnp.concat([samples, homogeneous_sample_ones], axis=-1)
+    homogeneous_sample_ones = jnp.ones(samples.shape[:-1] + (1,), dtype=jnp.float32)
+    homogeneous_sample_coords = jnp.concatenate(
+        [samples, homogeneous_sample_ones], axis=-1
+    )
 
     # When we transform the coordinates per-image, we broadcast on both sides-
     # the batching dimensions broadcast up the coordinate grid, and the
     # coordinate center broadcasts up along the height and width.
     # Per-pixel, the algebraic distance is v^T * M * v, where M is the matrix
     # of the conic section, and v is the homogeneous column vector [x y z 1]^T.
-    half_distance = jnp.matmul(quadric, homogeneous_sample_coords, transpose_b=True)
+    length = len(homogeneous_sample_coords.shape)
+    half_distance = jnp.matmul(
+        quadric, jnp.swapaxes(homogeneous_sample_coords, length - 2, length - 1)
+    )
+
     rank = batching_rank + 2
     half_distance = jnp.transpose(
-        half_distance, perm=list(range(rank - 2)) + [rank - 1, rank - 2]
+        half_distance, axes=list(range(rank - 2)) + [rank - 1, rank - 2]
     )
     algebraic_distance = jnp.sum(
         jnp.multiply(homogeneous_sample_coords, half_distance), axis=-1
     )
-    return jnp.reshape(algebraic_distance, batching_dimensions + [sample_count, 1])
+    return jnp.reshape(algebraic_distance, batching_dimensions + (sample_count, 1))
 
 
 def decode_covariance_roll_pitch_yaw(radius, invert=False):
@@ -65,9 +72,15 @@ def decode_covariance_roll_pitch_yaw(radius, invert=False):
        matrices corresponding to the input radius vectors.
     """
     d = 1.0 / (radius[..., 0:3] + DIV_EPSILON) if invert else radius[..., 0:3]
-    diag = jnp.diag(d)
+
+    diag = vmap(jnp.diag)(d.reshape((-1, d.shape[-1])))
+    diag = diag.reshape(d.shape + (d.shape[-1],))
     rotation = camera_util.roll_pitch_yaw_to_rotation_matrices(radius[..., 3:6])
-    return jnp.matmul(jnp.matmul(rotation, diag), rotation, transpose_b=True)
+    length = len(rotation.shape)
+
+    return jnp.matmul(
+        jnp.matmul(rotation, diag), jnp.swapaxes(rotation, length - 2, length - 1)
+    )
 
 
 def sample_cov_bf(center, radius, samples):
@@ -92,16 +105,16 @@ def sample_cov_bf(center, radius, samples):
     # Decode 6D radius vectors into inverse covariance matrices, then extract
     # unique elements.
     inv_cov = decode_covariance_roll_pitch_yaw(radius, invert=True)
-    shape = jnp.concat([jnp.shape(inv_cov)[:-2], [1, 9]], axis=0)
+    shape = inv_cov.shape[:-2] + (1, 9)
     inv_cov = jnp.reshape(inv_cov, shape)
-    c00 = inv_cov[..., 0, 0]
-    c01 = inv_cov[..., 0, 1]
-    c02 = inv_cov[..., 0, 2]
+    c00 = inv_cov[..., 0, 0][..., None]
+    c01 = inv_cov[..., 0, 1][..., None]
+    c02 = inv_cov[..., 0, 2][..., None]
 
-    c11 = inv_cov[..., 1, 1]
-    c12 = inv_cov[..., 1, 2]
+    c11 = inv_cov[..., 1, 1][..., None]
+    c12 = inv_cov[..., 1, 2][..., None]
 
-    c22 = inv_cov[..., 2, 2]
+    c22 = inv_cov[..., 2, 2][..., None]
 
     # Compute function value.
     dist = (
@@ -182,7 +195,7 @@ def compute_shape_element_influences(quadrics, centers, radii, samples):
     # Select the number of samples along the ray. The larger this is, the
     # more memory that will be consumed and the slower the algorithm. But it
     # reduces warping artifacts and the likelihood of missing a thin surface.
-    batch_size, quadric_count = quadrics.shape[0:2]
+    batch_size, quadric_count = quadrics.shape[:2]
 
     # We separate the isometric, axis-aligned, and general RBF functions.
     # The primary reason for this is that the type of basis function
