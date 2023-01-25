@@ -257,7 +257,7 @@ def sample_loss(
         local_samples, _, local_gt = geom_util.local_views_of_shape(
             global_samples,
             structured_implicit.world2local,
-            local_point_count=model_config.hparams.spc,
+            num_local_points=model_config.hparams.spc,
             global_features=gt_class,
         )
         # This is an important distinction: With lrf='x', the implicit values are

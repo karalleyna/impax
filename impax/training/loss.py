@@ -3,11 +3,7 @@
 import jax.numpy as jnp
 
 from impax.datasets import shapenet
-# LDIF is an internal package, should be imported last.
-# pylint: disable=g-bad-import-order
 from impax.utils import geom_util, interpolate_util, logging_util, sdf_util
-
-# pylint: enable=g-bad-import-order
 
 
 def bounding_box_constraint_error(samples, box):
@@ -26,7 +22,9 @@ def shape_element_center_magnitude_loss(model_config, _, structured_implicit):
     return mse
 
 
-def element_center_lowres_grid_direct_loss(model_config, training_example, structured_implicit):
+def element_center_lowres_grid_direct_loss(
+    model_config, training_example, structured_implicit
+):
     element_centers = structured_implicit.element_centers
     gt_sdf_at_centers, _ = interpolate_util.interpolate(
         training_example.grid, element_centers, training_example.world2grid
@@ -35,38 +33,58 @@ def element_center_lowres_grid_direct_loss(model_config, training_example, struc
     return mse
 
 
-def element_center_lowres_grid_squared_loss(model_config, training_example, structured_implicit):
+def element_center_lowres_grid_squared_loss(
+    model_config, training_example, structured_implicit
+):
     element_centers = structured_implicit.element_centers
     gt_sdf_at_centers, _ = interpolate_util.interpolate(
         training_example.grid, element_centers, training_example.world2grid
     )
-    mse = model_config.hparams.gs * jnp.mean(jnp.sign(gt_sdf_at_centers) * jnp.square(gt_sdf_at_centers + 1e-04)) + 1e-5
+    mse = (
+        model_config.hparams.gs
+        * jnp.mean(jnp.sign(gt_sdf_at_centers) * jnp.square(gt_sdf_at_centers + 1e-04))
+        + 1e-5
+    )
     return mse
 
 
-def element_center_lowres_grid_inside_loss(model_config, training_example, structured_implicit):
+def element_center_lowres_grid_inside_loss(
+    model_config, training_example, structured_implicit
+):
     """Loss that element centers should lie within a voxel of the GT inside."""
     element_centers = structured_implicit.element_centers
     gt_sdf_at_centers, _ = interpolate_util.interpolate(
         training_example.grid, element_centers, training_example.world2grid
     )
-    gt_sdf_at_centers = jnp.where(gt_sdf_at_centers > model_config.hparams.igt, gt_sdf_at_centers, 0.0)
-    mse = model_config.hparams.ig * jnp.mean(jnp.square(gt_sdf_at_centers + 1e-04)) + 1e-05
+    gt_sdf_at_centers = jnp.where(
+        gt_sdf_at_centers > model_config.hparams.igt, gt_sdf_at_centers, 0.0
+    )
+    mse = (
+        model_config.hparams.ig * jnp.mean(jnp.square(gt_sdf_at_centers + 1e-04))
+        + 1e-05
+    )
     return mse
 
 
-def smooth_element_center_lowres_grid_inside_loss(model_config, training_example, structured_implicit):
+def smooth_element_center_lowres_grid_inside_loss(
+    model_config, training_example, structured_implicit
+):
     """Offset version of element_center_lowres_grid_inside_loss by voxel width."""
     element_centers = structured_implicit.element_centers
     gt_sdf_at_centers, _ = interpolate_util.interpolate(
         training_example.grid, element_centers, training_example.world2grid
     )
     gt_sdf_at_centers = jnp.maximum(gt_sdf_at_centers - model_config.hparams.igt, 0.0)
-    mse = model_config.hparams.ig * jnp.mean(jnp.square(gt_sdf_at_centers + 1e-04)) + 1e-05
+    mse = (
+        model_config.hparams.ig * jnp.mean(jnp.square(gt_sdf_at_centers + 1e-04))
+        + 1e-05
+    )
     return mse
 
 
-def center_variance_loss(model_config, training_example, structured_implicit):  # pylint:disable=unused-argument
+def center_variance_loss(
+    model_config, training_example, structured_implicit
+):  # pylint:disable=unused-argument
     """A loss on the -variance of the center locations."""
     # Training example present for interface uniformity
     element_centers = structured_implicit.element_centers
@@ -82,7 +100,9 @@ def center_variance_loss(model_config, training_example, structured_implicit):  
     return loss
 
 
-def center_nn_loss(model_config, training_example, structured_implicit):  # pylint:disable=unused-argument
+def center_nn_loss(
+    model_config, training_example, structured_implicit
+):  # pylint:disable=unused-argument
     """A loss that decreases with the nearest neighbor center->center distance."""
     # Training example present for interface uniformity
     element_centers = structured_implicit.element_centers
@@ -130,7 +150,9 @@ def inside_box_loss(model_config, _, structured_implicit):
         bounding_box.lower *= model_config.hparams.rsl
         bounding_box.upper *= model_config.hparams.rsl
 
-    bounding_box_error = jnp.mean(bounding_box_constraint_error(element_centers, bounding_box))
+    bounding_box_error = jnp.mean(
+        bounding_box_constraint_error(element_centers, bounding_box)
+    )
     outside_bounding_box_loss = model_config.hparams.ibblw * bounding_box_error
     return outside_bounding_box_loss
 
@@ -144,9 +166,15 @@ def shape_element_center_loss(model_config, training_example, structured_implici
     class_at_centers, _ = structured_implicit.class_at_samples(element_centers)
 
     bounding_box = training_example.sample_bounding_box
-    bounding_box_error = jnp.mean(bounding_box_constraint_error(element_centers, bounding_box), axis=-1, keep_dims=True)
+    bounding_box_error = jnp.mean(
+        bounding_box_constraint_error(element_centers, bounding_box),
+        axis=-1,
+        keep_dims=True,
+    )
     center_is_inside_gt_box = bounding_box_error <= 0.0
-    inside_prediction_weights = model_config.hparams.cc * jnp.array(center_is_inside_gt_box, dtype=jnp.float32)
+    inside_prediction_weights = model_config.hparams.cc * jnp.array(
+        center_is_inside_gt_box, dtype=jnp.float32
+    )
     # bounding_box_error has shape [batch_size, center_count, 1]
     # inside_prediction_weights has shape [batch_size, center_count, 1]
     # class_at_centers has shape [batch_size, center_count, 1]. (Double check).
@@ -167,7 +195,9 @@ def old_shape_element_center_loss(model_config, training_example, structured_imp
     logging_util.log.info("Element Center Shape: %s", str(element_centers.shape))
 
     bounding_box = training_example.sample_bounding_box
-    bounding_box_error = jnp.mean(bounding_box_constraint_error(element_centers, bounding_box))
+    bounding_box_error = jnp.mean(
+        bounding_box_constraint_error(element_centers, bounding_box)
+    )
     constraint_loss = model_config.hparams.ibblw * bounding_box_error
     class_at_centers, _ = structured_implicit.class_at_samples(element_centers)
     center_loss = jnp.mean((class_at_centers - 0) * (class_at_centers - 0))
@@ -200,18 +230,28 @@ def weighted_l2_loss(gt_value, pred_value, weights):
     return weights * squared_diff
 
 
-def sample_loss(model_config, gt_sdf, structured_implicit, global_samples, name, apply_ucf):
+def sample_loss(
+    model_config, gt_sdf, structured_implicit, global_samples, name, apply_ucf
+):
     """Computes an l2 loss for predicted-vs-gt insidedness at samples."""
-    gt_class = sdf_util.apply_class_transfer(gt_sdf, model_config, soft_transfer=False, offset=0.0)
+    gt_class = sdf_util.apply_class_transfer(
+        gt_sdf, model_config, soft_transfer=False, offset=0.0
+    )
 
     if model_config.hparams.lrf == "l":
-        global_decisions, local_outputs = structured_implicit.class_at_samples(global_samples)
+        global_decisions, local_outputs = structured_implicit.class_at_samples(
+            global_samples
+        )
         local_decisions, local_weights = local_outputs
         predicted_class = local_decisions
-        gt_class = jnp.tile(jnp.expand_dims(gt_class, axis=1), [1, model_config.hparams.sc, 1, 1])
+        gt_class = jnp.tile(
+            jnp.expand_dims(gt_class, axis=1), [1, model_config.hparams.sc, 1, 1]
+        )
         weights = local_weights
     elif model_config.hparams.lrf == "g":
-        global_decisions, local_outputs = structured_implicit.class_at_samples(global_samples)
+        global_decisions, local_outputs = structured_implicit.class_at_samples(
+            global_samples
+        )
         predicted_class = global_decisions
         weights = 1.0
     elif model_config.hparams.lrf == "x":
@@ -219,7 +259,7 @@ def sample_loss(model_config, gt_sdf, structured_implicit, global_samples, name,
         local_samples, _, local_gt = geom_util.local_views_of_shape(
             global_samples,
             structured_implicit.world2local,
-            local_point_count=model_config.hparams.spc,
+            num_local_points=model_config.hparams.spc,
             global_features=gt_class,
         )
         # This is an important distinction: With lrf='x', the implicit values are
@@ -236,30 +276,52 @@ def sample_loss(model_config, gt_sdf, structured_implicit, global_samples, name,
 
 def uniform_sample_loss(model_config, training_example, structured_implicit):
     """Loss that uniformly sampled points should have the right insidedness."""
-    sample_count = model_config.hparams.xsc if model_config.hparams.lrf == "x" else model_config.hparams.spc
+    sample_count = (
+        model_config.hparams.xsc
+        if model_config.hparams.lrf == "x"
+        else model_config.hparams.spc
+    )
     samples, gt_sdf = training_example.sample_sdf_uniform(sample_count=sample_count)
     logging_util.log.info("Building Uniform Sample Loss.")
     logging_util.log.info("Uni. Samples shape: %s", str(samples.shape))
     loss = model_config.hparams.l2w * sample_loss(
-        model_config, gt_sdf, structured_implicit, samples, "uniform_sample", apply_ucf=True
+        model_config,
+        gt_sdf,
+        structured_implicit,
+        samples,
+        "uniform_sample",
+        apply_ucf=True,
     )
     return loss
 
 
 def overlap_loss(model_config, training_example, structured_implicit):
     """A loss on the overlap between RBF weights."""
-    sample_count = model_config.hparams.xsc if model_config.hparams.lrf == "x" else model_config.hparams.spc
+    sample_count = (
+        model_config.hparams.xsc
+        if model_config.hparams.lrf == "x"
+        else model_config.hparams.spc
+    )
     samples, _ = training_example.sample_sdf_near_surface(sample_count=sample_count)
     rbf_influences = structured_implicit.rbf_influence_at_samples(samples)
     assert len(rbf_influences.shape) == 3  # [b, sample_count, eec]
-    loss = jnp.mean(jnp.linalg.norm(rbf_influences, ord=1, axis=2)) * model_config.hparams.ow
+    loss = (
+        jnp.mean(jnp.linalg.norm(rbf_influences, ord=1, axis=2))
+        * model_config.hparams.ow
+    )
     return loss
 
 
 def near_surface_sample_loss(model_config, training_example, structured_implicit):
     """An inside/outside loss that samples based on distance to the surface."""
-    sample_count = model_config.hparams.xsc if model_config.hparams.lrf == "x" else model_config.hparams.spc
-    samples, gt_sdf = training_example.sample_sdf_near_surface(sample_count=sample_count)
+    sample_count = (
+        model_config.hparams.xsc
+        if model_config.hparams.lrf == "x"
+        else model_config.hparams.spc
+    )
+    samples, gt_sdf = training_example.sample_sdf_near_surface(
+        sample_count=sample_count
+    )
     logging_util.log.info("Building Near Surface Sample Loss.")
     logging_util.log.info("NS Samples shape: %s", str(samples.shape))
     # TODO(kgenova) Currently we set ucf=True here because that's how it was...
@@ -304,4 +366,6 @@ def set_loss(model_config, training_example, structured_implicit):
     # TODO(kgenova) Consider returning the add_n result as a tensor, setting
     # the loss in the launcher, and having a separate scalar summarizer in
     # summarize.py
-    model_config.loss = compute_loss(model_config, training_example, structured_implicit)
+    model_config.loss = compute_loss(
+        model_config, training_example, structured_implicit
+    )
