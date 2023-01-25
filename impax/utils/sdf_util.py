@@ -31,8 +31,9 @@ def apply_class_transfer(
     if offset:
         sdf -= offset
     if soft_transfer:
+        # todo: this should enable trainable hardness but not possible
         if sigmoid_normalization:
-            hardness = [hardness]
+            hardness = hardness
         else:
             hardness = hardness
         return jax.nn.sigmoid(hardness * sdf)
