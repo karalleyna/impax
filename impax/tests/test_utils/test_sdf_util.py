@@ -21,9 +21,7 @@ def test_apply_class_transfer(seed):
     model_config = ConfigDict(cfg)
     org = original.apply_class_transfer(sdf, model_config, soft_transfer, offset, dtype)
 
-    ret = sdf_util.apply_class_transfer(
-        sdf, soft_transfer, offset, model_config.hparams.lhdn, model_config.hparams.hdn, dtype
-    )
+    ret = sdf_util.apply_class_transfer(sdf, model_config, soft_transfer, offset, dtype)
 
     assert jnp.allclose(org.numpy(), ret)
 

@@ -1,39 +1,39 @@
 """Tests for ldif.util.jax_util."""
 
+import jax
 import jax.numpy as jnp
-from absl.testing import parameterized
-from absl.testing import absltest
-
+import pytest
+import tensorflow as tf
+from absl.testing import absltest, parameterized
 
 from impax.utils import jax_util
+from ldif.ldif.util import tf_util as orig
 
 
-DISTANCE_EPS = 1e-6
-EXPECTED = {
-    (1, 0): jnp.array([[1.0, 2.0]]),
-    (0, 0): jnp.array([[3.0, 4.0]]),
-    (0, 1): jnp.array([[2.0], [4.0]]),
-    (1, 1): jnp.array([[1.0], [3.0]]),
-}
+@pytest.mark.parametrize("seed", [2, 4, 6, 8])
+@pytest.mark.parametrize("axis", [0, 1, 2, 3])
+def test_tile_new_axis(seed, axis):
+    key = jax.random.PRNGKey(seed)
+    key, key2 = jax.random.split(key)
+
+    t = jax.random.normal(key, shape=(10, 2, 3, 4))
+    lenght = int(jax.random.randint(key2, (1,), 5, 10))
+
+    gnd = orig.tile_new_axis(tf.convert_to_tensor(t), axis, lenght)
+    ret = jax_util.tile_new_axis(t, axis, lenght)
+
+    assert jnp.allclose(gnd.numpy(), ret)
 
 
-class JAXUtilTest(parameterized.TestCase):
-    @parameterized.product(elt=[0, 1], axis=[0, 1])
-    def testRemoveElement(self, elt, axis):
-        expected = EXPECTED[(elt, axis)]
-        initial = jnp.array([[1.0, 2.0], [3.0, 4.0]], dtype=jnp.float32)
-        removed = jax_util.remove_element(
-            initial, jnp.array([elt], dtype=jnp.int32), axis
-        )
+@pytest.mark.parametrize("seed", [2, 4, 6, 8])
+def test_zero_by_mask(seed):
+    key = jax.random.PRNGKey(seed)
+    key, key2 = jax.random.split(key)
 
-        distance = float(jnp.sum(jnp.abs(expected - removed)))
-        self.assertLess(
-            distance,
-            DISTANCE_EPS,
-            "Expected \n%s\n but got \n%s"
-            % (jnp.array_str(expected), jnp.array_str(removed)),
-        )
+    mask = jax.random.uniform(key, shape=(5, 4, 3, 2, 1)) > 0.5
+    vals = jax.random.normal(key2, shape=(5, 4, 3, 2, 100))
 
+    gnd = orig.zero_by_mask(tf.convert_to_tensor(mask), tf.convert_to_tensor(vals))
+    ret = jax_util.zero_by_mask(mask, vals)
 
-if __name__ == "__main__":
-    absltest.main()
+    assert jnp.allclose(gnd.numpy(), ret)

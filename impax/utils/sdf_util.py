@@ -9,7 +9,7 @@ import jax.numpy as jnp
 
 
 def apply_class_transfer(
-    sdf, soft_transfer, offset, sigmoid_normalization: True, hardness=100.0, dtype=None
+    sdf, model_config, soft_transfer, offset, dtype=None
 ):
     """Applies a class label transformation to an input sdf.
     Args:
@@ -32,10 +32,10 @@ def apply_class_transfer(
         sdf -= offset
     if soft_transfer:
         # todo: this should enable trainable hardness but not possible
-        if sigmoid_normalization:
-            hardness = hardness
+        if model_config.hparams.lhdn == 't':
+            hardness = model_config.hparams.hdn
         else:
-            hardness = hardness
+            hardness = model_config.hparams.hdn
         return jax.nn.sigmoid(hardness * sdf)
     else:
         if dtype is None or dtype == float:
