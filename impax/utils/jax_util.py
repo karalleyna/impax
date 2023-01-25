@@ -32,8 +32,8 @@ def zero_by_mask(mask, vals, replace_with=0.0):
     """
     mask_shape = mask.shape
     vals_shape = vals.shape
-    assert mask.shape == (vals_shape[:-1] + [1])
-    assert vals.shape == (mask_shape[:-1] + [vals_shape[-1]])
+    assert mask.shape == (vals_shape[:-1] + (1,))
+    assert vals.shape == (mask_shape[:-1] + (vals_shape[-1],))
     return jnp.where(mask, vals, replace_with)
 
 
