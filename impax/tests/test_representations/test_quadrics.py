@@ -1,4 +1,4 @@
-"""Tests for ResNet"""
+"""Tests for Quadrics"""
 
 import tensorflow as tf
 from absl.testing import absltest, parameterized
@@ -146,7 +146,7 @@ class QuadricsTest(parameterized.TestCase):
         )
 
         outputs = compute_shape_element_influences(quadrics, center, radii, samples)
-        
+
         for ret, ground_truth in zip(outputs, ground_truth_outputs):
             self.assertEqual(ret.shape, ground_truth.shape)
             assert jnp.allclose(ret, ground_truth.numpy())
