@@ -65,4 +65,4 @@ def merge_into(x, ys):
     out = []
     for y in ys:
         out.append(merge(x, y))
-    return
+    return out
