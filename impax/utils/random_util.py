@@ -7,7 +7,7 @@ https://github.com/google/ldif/blob/master/ldif/util/random_util.py
 import importlib
 
 import jax.numpy as jnp
-from jax import random
+from jax import random, vmap
 
 # local
 from impax.utils import geom_util
@@ -18,14 +18,13 @@ importlib.reload(geom_util)
 def random_shuffle_along_dim(x, dim, key=random.PRNGKey(0)):
     """Randomly shuffles the elements of 'DeviceArray' along axis with index 'dim'."""
     if dim == 0:
-        random.shuffle(key, x)
         return random.shuffle(key, x)
     DeviceArray_rank = len(x.shape)
-    perm = list(range(DeviceArray_rank))
-    perm[dim], perm[0] = perm[0], perm[dim]
-    x = jnp.transpose(x, perm=perm)
+    axes = list(range(DeviceArray_rank))
+    axes[dim], axes[0] = axes[0], axes[dim]
+    x = jnp.transpose(x, axes=axes)
     x = random.shuffle(key, x)
-    x = jnp.transpose(x, perm=perm)
+    x = jnp.transpose(x, axes=axes)
     return x
 
 
@@ -40,8 +39,8 @@ def random_pan_rotations(batch_size, key=random.PRNGKey(0)):
     return jnp.reshape(m, [batch_size, 4, 4])
 
 
-def random_pan_rotation_jnp():
-    theta = jnp.random.uniform(0, 2.0 * jnp.pi)
+def random_pan_rotation_jnp(key=random.PRNGKey(0)):
+    theta = random.uniform(key, maxval=2.0 * jnp.pi)
     m = jnp.array(
         [
             [jnp.cos(theta), 0, jnp.sin(theta), 0],
@@ -72,13 +71,16 @@ def random_rotations(batch_size, key=random.PRNGKey(0)):
     base_rot = jnp.stack([ct, st, zero, -st, ct, zero, zero, zero, one], axis=-1)
     base_rot = jnp.reshape(base_rot, [batch_size, 3, 3])
     v_outer = jnp.matmul(v[:, :, None], v[:, None, :])
-    rotation_3x3 = jnp.matmul(v_outer - jnp.eye(3, batch_shape=[batch_size]), base_rot)
+
+    rotation_3x3 = jnp.matmul(
+        v_outer - jnp.repeat(jnp.eye(3)[None, ...], batch_size, axis=0), base_rot
+    )
     return rotation_to_tx(rotation_3x3)
 
 
-def random_rotation_jnp():
+def random_rotation_jnp(key=random.PRNGKey(0)):
     """Returns a uniformly random SO(3) rotation as a [3,3] numpy array."""
-    vals = jnp.random.uniform(size=(3,))
+    vals = random.uniform(key, shape=(3,))
     theta = vals[0] * 2.0 * jnp.pi
     phi = vals[1] * 2.0 * jnp.pi
     z = 2.0 * vals[2]
@@ -93,8 +95,8 @@ def random_rotation_jnp():
 def random_scales(batch_size, minval, maxval, key=random.PRNGKey(0)):
     scales = random.uniform(key, shape=[batch_size, 3], minval=minval, maxval=maxval)
     hom_coord = jnp.ones([batch_size, 1], dtype=jnp.float32)
-    scales = jnp.concat([scales, hom_coord], axis=1)
-    return jnp.diag(scales)
+    scales = jnp.concatenate([scales, hom_coord], axis=1)
+    return vmap(jnp.diag)(scales)
 
 
 def random_transformation(origin):
@@ -123,11 +125,20 @@ def translation_to_tx(x):
     Returns:
       DeviceArray with shape [..., 4, 4].
     """
-    batch_dims = x.shape
-    empty_rot = jnp.eye(3, batch_shape=batch_dims)
-    rot = jnp.concat([empty_rot, x[..., None]], axis=-1)
-    hom_row = jnp.eye(4, batch_shape=batch_dims)[..., 3:4, :]
-    return jnp.concat([rot, hom_row], axis=-2)
+    batch_dims = x.shape[:-1]
+
+    identity_matrix = jnp.eye(3)
+    for dim in reversed(batch_dims):
+        identity_matrix = jnp.repeat(identity_matrix[None, ...], dim, axis=0)
+
+    rot = jnp.concatenate([identity_matrix, x[..., None]], axis=-1)
+
+    identity_matrix = jnp.eye(4)
+    for dim in reversed(batch_dims):
+        identity_matrix = jnp.repeat(identity_matrix[None, ...], dim, axis=0)
+
+    hom_row = identity_matrix[..., 3:4, :]
+    return jnp.concatenate([rot, hom_row], axis=-2)
 
 
 def rotation_to_tx(rot):
@@ -137,8 +148,14 @@ def rotation_to_tx(rot):
     Returns:
       DeviceArray with shape [..., 4, 4].
     """
-    batch_dims = rot.shape
-    empty_col = jnp.zeros(batch_dims + [3, 1], dtype=jnp.float32)
-    rot = jnp.concat([rot, empty_col], axis=-1)
-    hom_row = jnp.eye(4, batch_shape=batch_dims)[..., 3:4, :]
-    return jnp.concat([rot, hom_row], axis=-2)
+    batch_dims = rot.shape[:-2]
+    empty_col = jnp.zeros(batch_dims + (3, 1), dtype=jnp.float32)
+
+    rot = jnp.concatenate([rot, empty_col], axis=-1)
+    identity_matrix = jnp.eye(4)
+    for dim in reversed(batch_dims):
+        identity_matrix = jnp.repeat(identity_matrix[None, ...], dim, axis=0)
+
+    hom_row = identity_matrix[..., 3:4, :]
+
+    return jnp.concatenate([rot, hom_row], axis=-2)
