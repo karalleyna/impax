@@ -34,11 +34,11 @@ def _unflatten(vector, model_config):
             )
         constant, center, radius, iparams = jnp.split(
             vector,
-            [explicit_param_count, 3, radius_len, expected_implicit_length],
+            [explicit_param_count, explicit_param_count + 3, explicit_param_count + 3 + radius_len],
             axis=-1,
         )
     elif provided_length == total_explicit_length:
-        constant, center, radius = jnp.split(vector, [explicit_param_count, 3, radius_len], axis=-1)
+        constant, center, radius = jnp.split(vector, [explicit_param_count, explicit_param_count+3], axis=-1)
         iparams = None
     else:
         raise ValueError("Too few ijnput parameters for even explicit vector: %s" % repr(vector.shape))
@@ -479,7 +479,7 @@ class StructuredImplicit(object):
     def force_valid_values(self):
         self._constants = jnp.minimum(self._constants, -1e-10)
         if self._model_config.hparams.r == "cov":
-            axisr, rotr = jnp.split(self._radii, [3, 3], axis=-1)
+            axisr, rotr = jnp.split(self._radii, [3], axis=-1)
             axisr = jnp.maximum(axisr, 1e-9)
             rotr = jnp.clip(rotr, -jnp.pi / 4.0, jnp.pi / 4.0)
             self._radii = jnp.concatenate([axisr, rotr], axis=-1)
