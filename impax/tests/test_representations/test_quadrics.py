@@ -1,20 +1,18 @@
 """Tests for ResNet"""
 
-from absl.testing import absltest
-from absl.testing import parameterized
-
+import tensorflow as tf
+from absl.testing import absltest, parameterized
 from jax import numpy as jnp
 from jax import random
-import tensorflow as tf
 
 import ldif.ldif.representation.quadrics as original
 from impax.representations.quadrics import (
-    sample_quadric_surface,
-    decode_covariance_roll_pitch_yaw,
-    sample_cov_bf,
-    sample_axis_aligned_bf,
-    sample_isotropic_bf,
     compute_shape_element_influences,
+    decode_covariance_roll_pitch_yaw,
+    sample_axis_aligned_bf,
+    sample_cov_bf,
+    sample_isotropic_bf,
+    sample_quadric_surface,
 )
 
 
@@ -148,7 +146,7 @@ class QuadricsTest(parameterized.TestCase):
         )
 
         outputs = compute_shape_element_influences(quadrics, center, radii, samples)
-
+        
         for ret, ground_truth in zip(outputs, ground_truth_outputs):
             self.assertEqual(ret.shape, ground_truth.shape)
             assert jnp.allclose(ret, ground_truth.numpy())

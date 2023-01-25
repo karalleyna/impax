@@ -1,9 +1,8 @@
 """Utilities to evaluate quadric implicit surface functions."""
 import jax.numpy as jnp
 from jax import vmap
-from impax.utils import camera_util
-from impax.utils import jax_util
 
+from impax.utils import camera_util, jax_util
 
 NORMALIZATION_EPS = 1e-8
 SQRT_NORMALIZATION_EPS = 1e-4
@@ -107,14 +106,14 @@ def sample_cov_bf(center, radius, samples):
     inv_cov = decode_covariance_roll_pitch_yaw(radius, invert=True)
     shape = inv_cov.shape[:-2] + (1, 9)
     inv_cov = jnp.reshape(inv_cov, shape)
-    c00 = inv_cov[..., 0, 0][..., None]
-    c01 = inv_cov[..., 0, 1][..., None]
-    c02 = inv_cov[..., 0, 2][..., None]
+    c00 = inv_cov[..., 0]
+    c01 = inv_cov[..., 1]
+    c02 = inv_cov[..., 2]
 
-    c11 = inv_cov[..., 1, 1][..., None]
-    c12 = inv_cov[..., 1, 2][..., None]
+    c11 = inv_cov[..., 4]
+    c12 = inv_cov[..., 5]
 
-    c22 = inv_cov[..., 2, 2][..., None]
+    c22 = inv_cov[..., 8]
 
     # Compute function value.
     dist = (
