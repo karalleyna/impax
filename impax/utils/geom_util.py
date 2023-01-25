@@ -269,6 +269,16 @@ def local_views_of_shape(
     # local_points has size 64*1000*25*3*4 = 18mb
     # If we made an intermediate Array with shape [batch_size, num_frames,
     #   global_num_points, 3] -> 64 * 25 * 100000 * 3 * 4 = 1.8 Gb -> bad.
+    def _gather(x, y):
+        ret = vmap(
+            lambda x, y: vmap(jnp.take_along_axis, in_axes=(0, 0, None))(
+                x, y[..., None], 0
+            ),
+            in_axes=(0, 0),
+        )(x, y)
+        return ret
+
+    batch_size = global_points.shape[0]
 
     if is_zeros_invalid:
         # If we just set the global points to be very far away, they won't be a
@@ -290,7 +300,7 @@ def local_views_of_shape(
         jnp.expand_dims(to_homogeneous(global_points, is_point=True), axis=1),
         [1, num_frames, 1, 1],
     )
-    ndim = world2local
+    ndim = world2local.ndim
     all_local_points = jnp.matmul(
         tiled_global, jnp.swapaxes(world2local, ndim - 2, ndim - 1)
     )
@@ -303,13 +313,14 @@ def local_views_of_shape(
 
     sample_order = jnp.where(is_valid, probabilities, -distances)
     _, top_indices = lax.top_k(sample_order, k=num_local_points)
-    local_points = lax.gather(
-        all_local_points, top_indices, dimension_numbers=2, axis=-2
+
+    local_points = _gather(all_local_points, top_indices)
+    local_points = local_points[..., :3].reshape(
+        [batch_size, num_frames, num_local_points, 3]
     )
-
     is_valid = jnp.expand_dims(is_valid, axis=-1)
-    points_valid = lax.gather(is_valid, top_indices, batch_dims=2, axis=-2)
-
+    points_valid = _gather(is_valid, top_indices)
+    points_valid = points_valid.reshape([batch_size, num_frames, num_local_points, 1])
     if not expand_region:
         local_points = jnp.where(points_valid, local_points, 0.0)
 
@@ -323,17 +334,25 @@ def local_views_of_shape(
         all_local_normals = jnp.matmul(
             tiled_global_normals, jnp.swapaxes(local2world, ndim - 2, ndim - 1)
         )
-        local_normals = lax.gather(
-            all_local_normals, top_indices, batch_dims=2, axis=-2
-        )
-        # Remove the homogeneous coordinate now. It isn't a bug to normalize with
-        # it since it's zero, but it's confusing.
+        local_normals = _gather(all_local_normals, top_indices)
         local_normals = l2_normalize(local_normals[..., :3], axis=-1)
+        local_normals = local_normals.reshape(
+            [batch_size, num_frames, num_local_points, 3]
+        )
+
     else:
         local_normals = None
 
     if global_features is not None:
-        local_features = lax.gather(global_features, top_indices, batch_dims=1, axis=-2)
+        num_features = global_features.shape[-1]
+
+        local_features = vmap(jnp.take_along_axis, in_axes=(0, 0, None))(
+            global_features, top_indices, 0
+        )
+
+        local_features = local_features.reshape(
+            [batch_size, num_frames, num_local_points, num_features]
+        )
     else:
         local_features = None
     return local_points, local_normals, local_features, points_valid
