@@ -445,16 +445,16 @@ class StructuredImplicit(object):
         self._world2local = None
 
     @classmethod
-    def from_packed_vector(cls, packed_vector, net):
+    def from_packed_vector(cls, packed_vector, net, model_config):
         """Parse an already packed vector (NOT a network activation)."""
-        ensure_net_if_needed(net)
+        ensure_net_if_needed(net, model_config)
         constant, center, radius, iparam = _unflatten(packed_vector)
-        return cls(constant, center, radius, iparam, net)
+        return cls(constant, center, radius, iparam, net, model_config)
 
     @classmethod
     def from_activation(cls, activation, net, model_config):
         """Parse a network activation into a structured implicit function."""
-        ensure_net_if_needed(net)
+        ensure_net_if_needed(net, model_config)
         constant, center, radius, iparam = _unflatten(activation)
 
         if model_config.hparams.cp == "a":
