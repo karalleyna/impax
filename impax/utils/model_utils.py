@@ -130,7 +130,9 @@ class Decoder(nn.Module):
             x = nn.BatchNorm(self.use_running_average)(x)
             x = self.activation(x)
 
-        x = nn.Dense(spatial_shapes[-1][1] * spatial_shapes[-1][2] * spatial_shapes[-1][3])(x)
+        x = nn.Dense(
+            spatial_shapes[-1][1] * spatial_shapes[-1][2] * spatial_shapes[-1][3]
+        )(x)
         x = nn.BatchNorm(self.use_running_average)(x)
         x = self.activation(x)
 
@@ -203,10 +205,16 @@ class Embedder(nn.Module):
             im = jnp.reshape(x, [batch_size, height, width, channel_count])
         else:
             im = jnp.reshape(
-                jnp.transpose(x, axes=[0, 2, 3, 1, 4]), [batch_size, height, width, image_count * channel_count]
+                jnp.transpose(x, axes=[0, 2, 3, 1, 4]),
+                [batch_size, height, width, image_count * channel_count],
             )
 
-        x, spatial_shapes = Encoder(self.conv_layers, self.dense_layers, self.use_running_average, self.activation)(im)
+        x, spatial_shapes = Encoder(
+            self.conv_layers,
+            self.dense_layers,
+            self.use_running_average,
+            self.activation,
+        )(im)
 
         return x, spatial_shapes
 
@@ -239,5 +247,3 @@ if __name__ == "__main__":
     emb_vars = emb.init(key, inp)
 
     embedded, dims = emb.apply(emb_vars, inp)
-
-    print(embedded.shape, dims)
