@@ -288,7 +288,7 @@ def test_local_views_of_shape(
         num_local_points,
         global_normals=global_normals,
         global_features=global_features,
-        zeros_invalid=is_zeros_invalid,
+        is_zeros_invalid=is_zeros_invalid,
         zero_threshold=zero_threshold,
         expand_region=expand_region,
         threshold=threshold
@@ -303,14 +303,16 @@ def test_local_views_of_shape(
         assert jnp.allclose(ret, ground_truth.numpy())
 
 
+@pytest.mark.parametrize("batch_size", [1, 2, 4])
+@pytest.mark.parametrize("length", [4, 6])
+@pytest.mark.parametrize("sample_count", [4, 8])
 def test_interpolate_from_grid_coordinates(
-    batch_size=4,
-    height=3,
-    width=3,
-    sample_count=2,
-    length=3,
+    batch_size,
+    length,
+    sample_count,
     key=random.PRNGKey(0),
 ):
+    height = width = length
     key0, key1 = random.split(key)
     samples_shape = (batch_size, sample_count, 3)
     grid_shape = (
@@ -328,6 +330,7 @@ def test_interpolate_from_grid_coordinates(
     )
 
     ret = geom_util.interpolate_from_grid_coordinates(samples, grid)
+
     if isinstance(ground_truth, tuple):
         for r, g in zip(ret, ground_truth):
             assert r.shape == g.shape

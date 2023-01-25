@@ -4,8 +4,7 @@ import jax.numpy as jnp
 from jax import lax, random, vmap
 
 # local
-from impax.utils import jnp_util
-from impax.utils import camera_util
+from impax.utils import camera_util, jnp_util
 
 
 def _to_4x4_rotation(rotation, viewpoint):
@@ -865,7 +864,7 @@ def interpolate_from_grid_coordinates(samples, grid):
     offset_samples = samples  # Used to subtract 0.5
     lower_coords = jnp.floor(offset_samples).astype(jnp.int32)
     upper_coords = lower_coords + 1
-    alphas = jnp.floor(offset_samples)
+    alphas = jnp.fmod(offset_samples, 1)
 
     maximum_value = grid.shape[1:4]
     size_per_channel = jnp.tile(
@@ -887,15 +886,12 @@ def interpolate_from_grid_coordinates(samples, grid):
         x_coord = jnp.clip(x_coord, 0, width - 1)
         for yi, y_coord in enumerate([lower_coords[:, :, 1], upper_coords[:, :, 1]]):
             y_coord = jnp.clip(y_coord, 0, height - 1)
-            for zi, z_coord in enumerate(
-                [lower_coords[:, :, 2], upper_coords[:, :, 2]]
-            ):
+            for zi, z_coord in enumerate([lower_coords[:, :, 2], upper_coords[:, :, 2]]):
                 z_coord = jnp.clip(z_coord, 0, length - 1)
                 flat_lookup = z_coord * height * width + y_coord * width + x_coord
                 lookup_coords[xi][yi].append(flat_lookup)
-                print(flattened_grid.shape, flat_lookup.shape)
 
-                lookup_result = jnp.take_along_axis(flattened_grid, flat_lookup, axis=0)
+                lookup_result = jnp.take_along_axis(flattened_grid, flat_lookup, axis=1)
                 lookup_result = 1.0 * lookup_result
                 corners[xi][yi].append(lookup_result)
 
@@ -917,8 +913,9 @@ def interpolate_from_grid_coordinates(samples, grid):
     # Finally interpolate a point along z:
     p = l0 * (1.0 - alpha_z) + l1 * alpha_z
 
-    assert p.shape == [batch_size, num_samples], "interpolate_from_grid:p"
+    assert p.shape == (batch_size, num_samples), "interpolate_from_grid:p"
 
     p = jnp.reshape(p, [batch_size, num_samples, 1])
     validity_mask = jnp.reshape(validity_mask, [batch_size, num_samples, 1])
     return p, validity_mask
+
