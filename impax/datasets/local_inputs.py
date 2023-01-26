@@ -7,7 +7,7 @@ import tensorflow as tf
 
 # LDIF is an internal package, should be imported last.
 # pylint: disable=g-bad-import-order
-from impax.datasets import process_element
+from impax.datasets import process_elements
 from impax.inference import example
 from impax.utils.file_util import log
 
@@ -16,7 +16,7 @@ from impax.utils.file_util import log
 
 def _make_optimized_dataset(directory, batch_size, mode, split):
     filenames = glob.glob(f"{directory}/optimized/{split}/*.tfrecords")
-    log.verbose(f"Making dataset from the following files: {filenames}")
+    log.info(f"Making dataset from the following files: {filenames}")
     dataset = tf.data.TFRecordDataset(
         filenames=filenames, compression_type="GZIP", buffer_size=None, num_parallel_reads=8
     )
@@ -25,11 +25,10 @@ def _make_optimized_dataset(directory, batch_size, mode, split):
         dataset = dataset.shuffle(buffer_size=2 * batch_size)
         dataset = dataset.repeat()
 
-    dataset = dataset.map(process_element.parse_tf_example, num_parallel_calls=os.cpu_count())
+    dataset = dataset.map(process_elements.parse_tf_example, num_parallel_calls=os.cpu_count())
 
     dataset = dataset.batch(batch_size, drop_remainder=True).prefetch(1)
-
-    dataset_items = tf.compat.v1.data.make_one_shot_iterator(dataset).get_next()
+    dataset_items = next(iter(dataset))
     return build_dataset_obj(dataset_items, batch_size)
 
 
@@ -65,10 +64,10 @@ def make_dataset(directory, batch_size, mode, split):
         dataset = dataset.shuffle(buffer_size=2 * batch_size)
         dataset = dataset.repeat()
 
-    dataset = dataset.map(process_element.parse_example, num_parallel_calls=os.cpu_count())
+    dataset = dataset.map(process_elements.parse_example, num_parallel_calls=os.cpu_count())
 
     bs = batch_size
     dataset = dataset.batch(bs, drop_remainder=True).prefetch(1)
 
-    dataset_items = tf.compat.v1.data.make_one_shot_iterator(dataset).get_next()
+    dataset_items = next(iter(dataset))
     return build_dataset_obj(dataset_items, bs)
