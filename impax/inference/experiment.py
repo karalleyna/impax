@@ -21,7 +21,7 @@ import numpy as np
 
 # ldif is an internal package, should be imported last.
 # pylint: disable=g-bad-import-order
-from impax.model import hparams as hparams_util
+from impax.models.structured_implicit_function import hparams as hparams_util
 from impax.utils import file_util, path_util
 from impax.utils.file_util import log
 
