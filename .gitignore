@@ -7,7 +7,7 @@ __pycache__/
 *.so
 
 ldif/
-
+*.obj
 # Distribution / packaging
 .Python
 build/
