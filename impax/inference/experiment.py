@@ -19,13 +19,11 @@ import os
 
 import numpy as np
 
-# ldif is an internal package, should be imported last.
-# pylint: disable=g-bad-import-order
-from impax.models.structured_implicit_function import hparams as hparams_util
+
+from impax.models.model import hparams as hparams_util
 from impax.utils import file_util, path_util
 from impax.utils.file_util import log
 
-# pylint: enable=g-bad-import-order
 
 importlib.reload(hparams_util)
 
@@ -80,7 +78,9 @@ class Job(object):
             val = getattr(self, a)
             is_initialized = val is not None
             if is_initialized:
-                raise ValueError("Attribute %s has already been set to value %s" % (a, repr(val)))
+                raise ValueError(
+                    "Attribute %s has already been set to value %s" % (a, repr(val))
+                )
 
     def set_use_temp_ckpts(self, useable):
         assert useable in [True, False, "warn"]
@@ -94,7 +94,8 @@ class Job(object):
     def ensure_visible(self):
         if not self.is_visible:
             raise ValueError(
-                "Job failed ensure_visible() check: %i. Only %i are visible." % (self.xid, self.experiment.visible_xids)
+                "Job failed ensure_visible() check: %i. Only %i are visible."
+                % (self.xid, self.experiment.visible_xids)
             )
 
     @property
@@ -117,7 +118,9 @@ class Job(object):
     def all_checkpoints(self):
         """A list of all checkpoint objects in the checkpoint directory."""
         if self._all_checkpoints is None:
-            candidates = [os.path.basename(n) for n in file_util.glob(f"{self.ckpt_dir}/*")]
+            candidates = [
+                os.path.basename(n) for n in file_util.glob(f"{self.ckpt_dir}/*")
+            ]
             inds = [
                 int(x.replace("model.ckpt-", "").replace(".index", ""))
                 for x in candidates
@@ -126,7 +129,9 @@ class Job(object):
             inds.sort(reverse=False)
             # The train task may delete the 5 most recent checkpoints periodically:
             if not inds:
-                raise ValueError("There are no checkpoints in the directory %s." % self.ckpt_dir)
+                raise ValueError(
+                    "There are no checkpoints in the directory %s." % self.ckpt_dir
+                )
             elif self._use_temp_ckpts is True:  # pylint: disable=g-bool-id-comparison
                 message = "Temporary checkpoints are enabled."
                 message += " The most recent temporary checkpoint is %i." % inds[-1]
@@ -137,11 +142,16 @@ class Job(object):
                 log.warning(message)
             elif len(inds) < 6:
                 if self._use_temp_ckpts == "warn":
-                    warning = "No permanent checkpoints. Resorting to temporary one: %i" % inds[-1]
+                    warning = (
+                        "No permanent checkpoints. Resorting to temporary one: %i"
+                        % inds[-1]
+                    )
                     log.warning(warning)
                     inds = [inds[-1]]
                 elif not self._use_temp_ckpts:
-                    raise ValueError("Only temporary checkpoints are available, and they are not enabled.")
+                    raise ValueError(
+                        "Only temporary checkpoints are available, and they are not enabled."
+                    )
             else:
                 inds = inds[:-5]
             self._all_checkpoints = [Checkpoint(self, ind) for ind in inds]
@@ -155,11 +165,15 @@ class Job(object):
             cands = [c for c in self.all_checkpoints if c.idx <= idx]
             if not cands:
                 raise ValueError(
-                    "No checkpoint present before %i. All indices: %s" % (idx, repr(self.all_checkpoint_indices))
+                    "No checkpoint present before %i. All indices: %s"
+                    % (idx, repr(self.all_checkpoint_indices))
                 )
             c = cands[-1]  # Pre-sorted.
         if must_equal and c.idx != idx:
-            raise ValueError("Couldn't find exactly requested checkpoint %i: %i chosen." % (idx, c.idx))
+            raise ValueError(
+                "Couldn't find exactly requested checkpoint %i: %i chosen."
+                % (idx, c.idx)
+            )
         return c
 
     @property
@@ -168,7 +182,9 @@ class Job(object):
 
     def ensure_has_at_least_one_checkpoint(self):
         if not self.has_at_least_one_checkpoint:
-            raise ValueError("There are no checkpoints for this job (xid %i)." % self.xid)
+            raise ValueError(
+                "There are no checkpoints for this job (xid %i)." % self.xid
+            )
 
     @property
     def checkpoint_count(self):
@@ -187,7 +203,8 @@ class Job(object):
             raise ValueError("Invalid k: %i. k must be >= 1." % k)
         elif self.checkpoint_count < 2 * k:
             raise ValueError(
-                "Can't selected %i checkpoints when %i < 2*%i are present." % (k, self.checkpoint_count, k)
+                "Can't selected %i checkpoints when %i < 2*%i are present."
+                % (k, self.checkpoint_count, k)
             )
         else:
             chosen = np.linspace(start=0, stop=self.checkpoint_count, num=k)
@@ -203,7 +220,11 @@ class Job(object):
             if file_util.exists(hparam_path):
                 log.info("Found serialized hparams. Loading from %s" % hparam_path)
                 # hparams = hparams_util.read_hparams(hparam_path)
-                self._hparams = hparams_util.read_hparams_with_new_backwards_compatible_additions(hparam_path)
+                self._hparams = (
+                    hparams_util.read_hparams_with_new_backwards_compatible_additions(
+                        hparam_path
+                    )
+                )
             else:
                 raise ValueError("No serialized hparam file found at %s" % hparam_path)
         return self._hparams
@@ -227,14 +248,20 @@ class Experiment(object):
             log.verbose("Regex expanding root to find experiment ID")
             options = file_util.glob(self.root[:-1] + "*")
             if len(options) != 1:
-                log.verbose("Tried to glob for directory but didn't find one path. Found:")
+                log.verbose(
+                    "Tried to glob for directory but didn't find one path. Found:"
+                )
                 log.verbose(options)
                 raise ValueError("Directory not found: %s" % self.root)
             else:
                 self.root = options[0] + "/"
                 self.experiment_name = os.path.basename(self.root.strip("/"))
-                self.experiment_name = self.experiment_name.replace(self.model_name + "-", "")
-                log.verbose("Expanded experiment name with regex to root: %s" % self.root)
+                self.experiment_name = self.experiment_name.replace(
+                    self.model_name + "-", ""
+                )
+                log.verbose(
+                    "Expanded experiment name with regex to root: %s" % self.root
+                )
 
         job_strs = [os.path.basename(n) for n in file_util.glob(f"{self.root}/*")]
 
@@ -251,18 +278,24 @@ class Experiment(object):
         for xid in ordered_xids:
             if xid not in self.visible_xids:
                 raise ValueError(
-                    "Trying to order xids with an unknown input xid: %i not in %i" % (xid, self.visible_xids)
+                    "Trying to order xids with an unknown input xid: %i not in %i"
+                    % (xid, self.visible_xids)
                 )
         for xid in self.visible_xids:
             if xid not in ordered_xids:
-                raise ValueError("Trying to order xids without specifing xid: %i not in %i" % (xid, ordered_xids))
+                raise ValueError(
+                    "Trying to order xids without specifing xid: %i not in %i"
+                    % (xid, ordered_xids)
+                )
         xid_to_pos = {ordered_xids[i]: i for i in range(len(ordered_xids))}
         self._visible_jobs.sort(key=lambda j: xid_to_pos[j.xid])
 
     def job_with_xid(self, xid):
         jobs = [x for x in self.all_jobs if x.xid == xid]
         if len(jobs) != 1:
-            raise ValueError("Expected one match for xid %i, but got: %s" % (xid, repr(jobs)))
+            raise ValueError(
+                "Expected one match for xid %i, but got: %s" % (xid, repr(jobs))
+            )
         return jobs[0]
 
     def filter_jobs_by_xid(self, xids):
@@ -287,7 +320,9 @@ class Experiment(object):
     def job_from_xmanager_id(self, xid, must_be_visible=True):
         s = [j for j in self.all_jobs if j.xid == int(xid)]
         if len(s) != 1:
-            raise ValueError("Trouble matching xmanager id. Expected one match but got %s" % repr(s))
+            raise ValueError(
+                "Trouble matching xmanager id. Expected one match but got %s" % repr(s)
+            )
         j = s[0]
         if must_be_visible:
             j.ensure_visible()
@@ -324,7 +359,11 @@ class ResultStore(object):
         raise NotImplementedError("Please pick a remote backing store.")
 
     def remote_result_ckpt_dir(self, xid):
-        s = "%s/%s/%s/" % (self.remote_root, self.experiment.experiment_name, self.experiment.job_from_xmanager_id(xid))
+        s = "%s/%s/%s/" % (
+            self.remote_root,
+            self.experiment.experiment_name,
+            self.experiment.job_from_xmanager_id(xid),
+        )
         return s
 
     def local_result_ckpt_dir(self, xid):
@@ -350,7 +389,10 @@ class ResultStore(object):
             return max(candidates)
         else:
             if xid not in self.desired_ckpts:
-                raise ValueError("Provided desired ckpts %s but no entry for %i" % (repr(self.desired_ckpts), xid))
+                raise ValueError(
+                    "Provided desired ckpts %s but no entry for %i"
+                    % (repr(self.desired_ckpts), xid)
+                )
             desired = self.desired_ckpts[xid]
             if desired not in candidates:
                 raise ValueError(
@@ -368,7 +410,10 @@ class ResultStore(object):
         # Ensure it's a valid directory:
         if not file_util.exists(s):
             raise ValueError(
-                ("No directory for split %s and ckpt %i for for xid %i." " Expected path was: %s")
+                (
+                    "No directory for split %s and ckpt %i for for xid %i."
+                    " Expected path was: %s"
+                )
                 % (split, ckpt, xid, s)
             )
         self.remote_base_dirs[split][xid] = s
@@ -383,7 +428,9 @@ class ResultStore(object):
             base = self.remote_result_base(xid, split)
             mesh_paths = file_util.glob(f"{base}/*/*.ply")
             if not mesh_paths and ensure_nonempty:
-                raise ValueError("No meshes present for xid %i with path %s" % (xid, base))
+                raise ValueError(
+                    "No meshes present for xid %i with path %s" % (xid, base)
+                )
                 # TODO(kgenova) Now we are assuming hashes are not replicated in
                 # multiple synsets.
             mesh_names = set()
@@ -397,7 +444,8 @@ class ResultStore(object):
                 all_mesh_names = all_mesh_names.intersection(mesh_names)
         if ensure_nonempty and not all_mesh_names:
             raise ValueError(
-                "There are 0 meshes common to the xids %i for split %s" % (repr(self.experiment.visible_xids), split)
+                "There are 0 meshes common to the xids %i for split %s"
+                % (repr(self.experiment.visible_xids), split)
             )
         self._remote_mesh_names = list(all_mesh_names)
         return list(all_mesh_names)
@@ -427,7 +475,8 @@ class ResultStore(object):
         chosen = candidates[:count]
         if len(chosen) != count:
             raise ValueError(
-                "Not enough meshes are available. Requested %i but there are %i." % (count, len(candidates))
+                "Not enough meshes are available. Requested %i but there are %i."
+                % (count, len(candidates))
             )
         return chosen
 
@@ -449,7 +498,7 @@ class ResultStore(object):
 
     def _mesh_relative_path(self, mesh_name):
         synset = mesh_name.split("|")[0]
-        mesh_hash = mesh_name[len(synset) + 1:]
+        mesh_hash = mesh_name[len(synset) + 1 :]
         path = "%s/%s.ply" % (synset, mesh_hash)
         return path
 
