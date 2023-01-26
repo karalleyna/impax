@@ -88,6 +88,7 @@ class StructuredImplicitModel(nn.Module):
     _eval_implicit_parameters_call_count: int = 0
     _enable_deprecated: bool = False
 
+    @nn.compact
     def _global_local_forward(self, observation):
         """A forward pass that include both template and element inference."""
 
