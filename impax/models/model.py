@@ -1,15 +1,18 @@
 """Example models."""
-from logging import log
+
 import jax.numpy as jnp
-from jax import random
+from jax import random, vmap
+
 import flax.linen as nn
+
 from typing import Any
+from logging import log
+
 import ml_collections
-from impax.networks.cnn import EarlyFusionCNN, MidFusionCNN
-from impax.networks.occnet import Decoder
 
 # local
-
+from impax.networks.cnn import EarlyFusionCNN, MidFusionCNN
+from impax.networks.occnet import Decoder
 from impax.networks.pointnet import PointNet
 
 from impax.representations import structured_implicit_function
@@ -34,8 +37,8 @@ class PointEncoder(nn.Module):
         batch_size = points.shape[0]
         embedding = PointNet(
             self.output_dim,
-            self.model_config.hparams.maxpool_feature,
-            self.model_config.hparams.to_64d,
+            self.model_config.maxpool_feature,
+            self.model_config.to_64d,
         )(points)
 
         embedding = jnp.reshape(embedding, [batch_size, self.output_dim])
@@ -48,6 +51,7 @@ class PointNetSIFPredictor(nn.Compact):
     element_count: int
     element_length: int
     model_config: ml_collections.ConfigDict
+    max_encodable: int = 1024
 
     @nn.compact
     def __call__(self, observation, key: random.PRNGKey = random.PRNGKey(0)):
@@ -56,10 +60,8 @@ class PointNetSIFPredictor(nn.Compact):
         inputs = jnp.concatenate(
             [observation.surface_points, observation.normals], axis=-1
         )
-        batch_size = inputs.shape[0]
-        sample_count = inputs.shape[1]
-        max_encodable = 1024
-        if sample_count > max_encodable:
+        batch_size, sample_count = inputs.shape[:2]
+        if sample_count > self.max_encodable:
             sample_indices = random.randint(
                 key,
                 [batch_size, sample_count],
@@ -86,14 +88,16 @@ class StructuredImplicitModel(nn.Module):
     _eval_implicit_parameters_call_count: int = 0
     _enable_deprecated: bool = False
 
-    def __init__(self):
+    def _global_local_forward(self, observation):
+        """A forward pass that include both template and element inference."""
+
         explicit_element_length = structured_implicit_function.element_explicit_dof(
             self.model_config
         )
         implicit_embedding_length = structured_implicit_function.element_implicit_dof(
             self.model_config
         )
-        element_count = self.model_config.hparams.num_shape_elements
+        num_elements = self.model_config.num_shape_elements
 
         if explicit_element_length <= 0:
             raise ValueError(
@@ -102,28 +106,34 @@ class StructuredImplicitModel(nn.Module):
                 % (implicit_embedding_length, explicit_element_length)
             )
 
-        if self.model_config.hparams.model_architecture == "efcnn":
-            self.inference_model = EarlyFusionCNN(element_count)
-        elif self.model_config.hparams.model_architecture == "mfcnn":
-            self.inference_model = MidFusionCNN()
-        elif self.model_config.hparams.model_architecture == "pn":
-            self.inference_model = PointNetSIFPredictor()
+        if self.model_config.model_architecture == "efcnn":
+            self.inference_model = EarlyFusionCNN(
+                num_elements, explicit_element_length
+            )(jnp.array(observation.tensor))
+        elif self.model_config.model_architecture == "mfcnn":
+            self.inference_model = MidFusionCNN(num_elements, explicit_element_length)(
+                jnp.array(observation.tensor),
+                jnp.array(observation.cam_to_worlds),
+            )
+
+        elif self.model_config.model_architecture == "pn":
+            self.inference_model = PointNetSIFPredictor(
+                num_elements, explicit_element_length, self._model_config
+            )
         else:
             raise ValueError(
                 "Invalid StructuredImplicitModel architecture hparam: %s"
-                % model_config.hparams.model_architecture
+                % self.model_config.model_architecture
             )
-        if self.model_config.hparams.enable_implicit_parameters:
+        if self.model_config.enable_implicit_parameters:
             self.single_element_implicit_eval_fun = Decoder
         else:
             self.single_element_implicit_eval_fun = None
 
-    def _global_local_forward(self, observation):
-        """A forward pass that include both template and element inference."""
-        batch_size = self._model_config.hparams.batch_size
-        num_shape_elements = self._model_config.hparams.num_shape_elements
-        sampling_scheme = self._model_config.hparams.sampling_scheme
-        implicit_parameter_length = self._model_config.hparams.implicit_parameter_length
+        batch_size = self.model_config.batch_size
+        num_shape_elements = self.model_config.num_shape_elements
+        sampling_scheme = self.model_config.sampling_scheme
+        implicit_parameter_length = self.model_config.implicit_parameter_length
 
         explicit_parameters, explicit_embedding = self.inference_model(observation)
         sif = structured_implicit_function.StructuredImplicit.from_activation(
@@ -137,7 +147,7 @@ class StructuredImplicitModel(nn.Module):
             (local_points, local_normals, _, _,) = geom_util.local_views_of_shape(
                 observation.surface_points,
                 world2local,
-                local_point_count=self._model_config.hparams.num_local_points,
+                local_point_count=self.model_config.num_local_points,
                 global_normals=observation.normals,
             )
             # Output shapes are both [B, EC, LPC, 3].
@@ -146,7 +156,7 @@ class StructuredImplicitModel(nn.Module):
                     local_points,
                     [
                         batch_size * num_shape_elements,
-                        self._model_config.hparams.num_local_points,
+                        self.model_config.num_local_points,
                         3,
                     ],
                 )
@@ -155,14 +165,14 @@ class StructuredImplicitModel(nn.Module):
                     jnp.concatenate([local_points, local_normals], axis=-1),
                     [
                         batch_size * num_shape_elements,
-                        self._model_config.hparams.num_local_points,
+                        self.model_config.num_local_points,
                         6,
                     ],
                 )
-            encoded_iparams = point_encoder(
+            encoded_iparams = PointEncoder(
                 flat_point_features,
                 implicit_parameter_length,
-                self._model_config,
+                self.model_config,
             )
             iparams = jnp.reshape(
                 encoded_iparams,
@@ -183,25 +193,24 @@ class StructuredImplicitModel(nn.Module):
         else:
             embedding = explicit_embedding
         self._forward_call_count += 1
-        return Prediction(self._model_config, observation, sif, embedding)
+        return Prediction(self.model_config, observation, sif, embedding)
 
     @nn.compact
     def __call__(self, observation):
         """Evaluates the explicit and implicit parameter vectors as a Prediction."""
-        implicit_architecture = self._model_config.hparams.implicit_architecture
+        implicit_architecture = self.model_config.implicit_architecture
         if implicit_architecture == "p":
             return self._global_local_forward(observation)
-        log.info("Call #%i to %s.forward().", self._forward_call_count, self._name)
-        element_count = self._model_config.hparams.num_shape_elements
+        element_count = self.model_config.num_shape_elements
         flat_element_length = structured_implicit_function.element_dof(
-            self._model_config
+            self.model_config
         )
         if implicit_architecture == "1":
             structured_implicit_activations, embedding = self.inference_model(
                 observation,
                 element_count,
                 flat_element_length,
-                self._model_config,
+                self.model_config,
             )
         elif implicit_architecture == "2":
             (structured_implicit_activations, embedding,) = TwinInference(
@@ -209,7 +218,7 @@ class StructuredImplicitModel(nn.Module):
                 observation,
                 element_count,
                 flat_element_length,
-                self._model_config,
+                self.model_config,
             )
         else:
             raise ValueError(f"Invalid value for {implicit_architecture}")
@@ -217,11 +226,11 @@ class StructuredImplicitModel(nn.Module):
         self._forward_call_count += 1
         structured_implicit = (
             structured_implicit_function.StructuredImplicit.from_activation(
-                self._model_config, structured_implicit_activations, self
+                self.model_config, structured_implicit_activations, self
             )
         )
         return Prediction(
-            self._model_config, observation, structured_implicit, embedding
+            self.model_config, observation, structured_implicit, embedding
         )
 
     def eval_implicit_parameters(self, implicit_parameters, samples):
@@ -263,7 +272,7 @@ class StructuredImplicitModel(nn.Module):
             batched_samples = jnp.reshape(
                 samples, [batch_size * element_count, sample_count, 3]
             )
-            if self._model_config.hparams.seperate_network:
+            if self.model_config.seperate_network:
                 raise ValueError(
                     "Incompatible hparams. Must use _deprecated_multielement_eval"
                     "if requesting separate network weights per shape element."
@@ -273,7 +282,7 @@ class StructuredImplicitModel(nn.Module):
                 batched_parameters,
                 batched_samples,
                 apply_sigmoid=False,
-                model_config=self._model_config,
+                model_config=self.model_config,
             )
             vals = jnp.reshape(
                 batched_vals, [batch_size, element_count, sample_count, 1]
@@ -283,23 +292,7 @@ class StructuredImplicitModel(nn.Module):
 
     def _deprecated_multielement_eval(self, implicit_parameters, samples):
         """An eval provided for backwards compatibility."""
-        vallist = []
-        implicit_parameter_list = tf.unstack(implicit_parameters, axis=1)
-        sample_list = tf.unstack(samples, axis=1)
-        log.info(
-            "BID0: Call {} to {}.eval_implicit_parameters().".format(
-                self._eval_implicit_parameters_call_count, self._name
-            )
+        evals = vmap(self.single_element_implicit_eval_fun, in_axes=(1, 1, None, None))(
+            implicit_parameters, samples
         )
-        log.info(f"BID0: List length: {len(implicit_parameter_list)}")
-        for i in range(len(implicit_parameter_list)):
-            log.info(f"BID0: Building eval_implicit_parameters for element {i}")
-            vallist.append(
-                self.single_element_implicit_eval_fun(
-                    implicit_parameter_list[i],
-                    sample_list[i],
-                    apply_sigmoid=False,
-                    model_config=self._model_config,
-                )
-            )
-        return jnp.stack(vallist, axis=1)
+        return evals
