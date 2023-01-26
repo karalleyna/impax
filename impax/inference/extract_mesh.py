@@ -5,7 +5,7 @@ from skimage import measure
 import trimesh
 
 # local
-from impax.utils import log
+from impax.utils.logging_util import log
 
 
 def marching_cubes(volume, mcubes_extent):
@@ -17,8 +17,7 @@ def marching_cubes(volume, mcubes_extent):
     assert resolution == height and resolution == width
     thresh = -0.07
     try:
-        vertices, faces, normals, _ = measure.marching_cubes_lewiner(volume, thresh)
-        del normals
+        vertices, faces, *_ = measure.marching_cubes(volume, thresh)
         x, y, z = [jnp.array(x) for x in zip(*vertices)]
         xyzw = jnp.stack([x, y, z, jnp.ones_like(x)], axis=1)
         # Center the volume around the origin:
@@ -50,7 +49,7 @@ def marching_cubes(volume, mcubes_extent):
         faces = jnp.stack([faces[..., 0], faces[..., 2], faces[..., 1]], axis=-1)
         world_space_xyz = xyzw[:, :3]
         mesh = trimesh.Trimesh(vertices=world_space_xyz, faces=faces)
-        log.verbose("Generated mesh successfully.")
+        log.info("Generated mesh successfully.")
         return True, mesh
     except (ValueError, RuntimeError) as e:
         log.warning(f"Failed to extract mesh with error {e}. Setting to unit sphere.")
