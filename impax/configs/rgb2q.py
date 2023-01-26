@@ -4,6 +4,51 @@ Consists of the definition of the hyperparameters of RGB2Q.
 import ml_collections
 
 
+def get_backward_compatible_config():
+    config = ml_collections.ConfigDict(
+        {
+            "l": "l2",
+            "input_width": "u",
+            "distillation_supervision": "a",
+            "background": "b",
+            "distillation_implicit_weight": 1.0,
+            "distillation_loss_weight": 1.0,
+            "whitening": False,
+            "reconstruction_loss_weight": 1.0,
+            "segmentation_loss_weight": 0.0,
+            "depth_loss_weight": 0.0,
+            "xyz_loss_weight": 0.0,
+            "extra_tasks": "",
+            "resolution": 137,
+            "decoder_architecture": "dl",
+            "tiling": False,
+            "image_type": "rgb",
+            "fix_object_detection": False,
+            "extra_prediction": False,
+            "secondary_encoder_enabled": True,
+            "to_xyz": False,
+            "use_prediction": True,
+            "depth_prediction_loss": False,
+            "to_decoder": False,
+            "segmentation": "n",
+            "depth_segmentation": "d",
+            "secondary_encoder_architecture": "epr50",
+            "depth_regression_loss_type": "l2",
+            "local_pointnet_encoder": False,
+            "explicit_component_length": 10,
+            "threshold": 4.0,
+            "point_validity": False,
+            "finetune_decoder": False,
+            "num_blobs": 0,
+            "add_normals": False,
+            "grf": False,
+            "add_secondary_input": False,
+            "is_normal_input": False,
+        }
+    )
+    return config
+
+
 def get_config():
     config = ml_collections.ConfigDict()
     # [identity]: The task identifier, for looking up backwards compatible hparams (below):
@@ -33,7 +78,7 @@ def get_config():
     # [ft]: ??
     config.ft = True
     # [aug]: How to apply input augmentation: 'f', 't', 'io'
-    config.input_augmentation = "f"
+    config.input_augmentation = False
     # [enc]: The encoder architecture. 'rn', 'sr50', 'vl', 'vlp':
     config.encoder = "rn"
     # [lset]: The levelset of the reconstruction:
@@ -66,42 +111,42 @@ def get_config():
     config.background = "ws"
 
     # [dlw]: The distillation loss weight:
-    config.distillation_loss_weight = (1.0,)
+    config.distillation_loss_weight = 1.0
     # [ilw]: The relative weight of implicits within the distillation loss:
-    config.distillation_implicit_weight = (1.0,)
+    config.distillation_implicit_weight = 1.0
     # [elw]: The relative weight of explicits within the distillation loss:
-    config.distillation_explicit_weight = (1.0,)
+    config.distillation_explicit_weight = 1.0
     # [slw]: The argmax segmentation task loss weight:
-    config.segmentation_loss_weight = (1.0,)
+    config.segmentation_loss_weight = 1.0
     # [tlw]: The depth task loss weight:
-    config.depth_loss_weight = (1.0,)
+    config.depth_loss_weight = 1.0
     # [xlw]: The xyz task loss weight:
-    config.xyz_loss_weight = (1.0,)
+    config.xyz_loss_weight = 1.0
     # [xt]: The set of extra tasks:
     # 'd': Predict depth
     # 'x': Predict XYZ
     # 'a': Predict the argmax image.
     # 's': Predict a segmentation image.
     # 'n': Predict a normals image.
-    config.extra_tasks = ("a",)
+    config.extra_tasks = "a"
     # [wh]: Whether to apply whitening:
     config.whitening = True
     # [rlw]: The reconstruction loss weight:
-    config.reconstruction_loss_weight = (1.0,)
+    config.reconstruction_loss_weight = 1.0
     # [res]: The operating resolution (excluding pretrained networks).
-    config.resolution = (137,)
+    config.resolution = 137
     # [dec]: The decoder architecture:
-    config.decoder_architecture = ("dl",)
+    config.decoder_architecture = "dl"
     # [et]: Whether to enable tiling to three channels for pretrained input support:
     config.tiling = False
     # [im]: The type of image to use for the input:
-    config.image_type = ("rgb",)
+    config.image_type = "rgb"
     # [eil: Whether to predict the blobs from the extra prediction.
     config.extra_prediction = False
     # [spt]: Whether the secondary encoder is pretrained (if there is one)
     config.secondary_encoder_enabled = True
     # [sec]: The secondary encoder architecture.
-    config.secondary_encoder_architecture = ("epr50",)
+    config.secondary_encoder_architecture = "epr50"
     # [txd]: Whether the depth prediction should be transformed to XYZ before being
     # given to the secondary encoder:
     config.to_xyz = True
@@ -117,9 +162,9 @@ def get_config():
     # 'p': Predicted: The loss is applied where the prediction segments.
     # 'g': Ground truth: The loss is applied based on the GT segmentation.
     # 'o': The loss is based on GT == 1.0
-    config.segmentation = ("n",)
+    config.segmentation = "n"
     # [lsn]: What kind of loss to apply for the normals.
-    config.normal_loss_type = ("a",)
+    config.normal_loss_type = "a"
     # [pnf] The predict normal's frame.
     # False for world('w'  in the original repo)
     # True for cam('c'  in the original repo)
@@ -147,7 +192,7 @@ def get_config():
     # [lpn]: Whether to add normals as a feature for the local pointnets.
     config.add_normals = False
     # [lpt]: The threshold (in radii) of the local pointclouds.
-    config.threshold = (4.0,)
+    config.threshold = 4.0
     # [vf]: Whether to add a point validity one-hot feature to the pointnet.
     config.point_validity = False
     # [fod]: Whether to fix the object_detection encoder defaults.
