@@ -38,7 +38,7 @@ def _unflatten(vector, model_config):
             axis=-1,
         )
     elif provided_length == total_explicit_length:
-        constant, center, radius = jnp.split(vector, [explicit_param_count, explicit_param_count+3], axis=-1)
+        constant, center, radius = jnp.split(vector, [explicit_param_count, explicit_param_count + 3], axis=-1)
         iparams = None
     else:
         raise ValueError("Too few ijnput parameters for even explicit vector: %s" % repr(vector.shape))
@@ -299,10 +299,10 @@ def homogenize(m):
     batch_dims = m.shape[:-2]
     n = m.shape[-1]
     assert m.shape[-2] == n
-    right_col = jnp.zeros(batch_dims + [3, 1], dtype=jnp.float32)
+    right_col = jnp.zeros(batch_dims + (3, 1), dtype=jnp.float32)
     m = jnp.concatenate([m, right_col], axis=-1)
     lower_row = jnp.pad(
-        jnp.zeros(batch_dims + [1, 3], dtype=jnp.float32),
+        jnp.zeros(batch_dims + (1, 3), dtype=jnp.float32),
         [(0, 0)] * batch_rank + [(0, 0), (0, 1)],
         mode="constant",
         constant_values=1.0,
@@ -635,10 +635,18 @@ class StructuredImplicit(object):
         # TODO(kgenova) Update this transformation to account for rotation.
 
         if self._model_config.hparams.tx == "i":
-            return jnp.eye(4, batch_shape=[self.batch_size, self.element_count])
+            return jnp.repeat(
+                jnp.repeat(jnp.eye(4)[None, None, ...], repeats=self.batch_size, axis=0),
+                repeats=self.element_count,
+                axis=1,
+            )
 
         if "c" in self._model_config.hparams.tx:
-            tx = jnp.eye(3, batch_shape=[self.batch_size, self.element_count])
+            tx = jnp.repeat(
+                jnp.repeat(jnp.eye(3)[None, None, ...], repeats=self.batch_size, axis=0),
+                repeats=self.element_count,
+                axis=1,
+            )
             centers = jnp.reshape(self._centers, [self.batch_size, self.element_count, 3, 1])
             tx = jnp.concatenate([tx, -centers], axis=-1)
             lower_row = jnp.tile(
@@ -648,22 +656,37 @@ class StructuredImplicit(object):
 
             tx = jnp.concatenate([tx, lower_row], axis=-2)
         else:
-            tx = jnp.eye(4, batch_shape=[self.batch_size, self.element_count])
+            tx = jnp.repeat(
+                jnp.repeat(jnp.eye(4)[None, None, ...], repeats=self.batch_size, axis=0),
+                repeats=self.element_count,
+                axis=1,
+            )
 
         # Compute a rotation transformation if necessary:
         if ("r" in self._model_config.hparams.tx) and (self._model_config.hparams.r == "cov"):
             # Apply the inverse rotation:
             rotation = jnp.linalg.inv(camera_util.roll_pitch_yaw_to_rotation_matrices(self._radii[..., 3:6]))
         else:
-            rotation = jnp.eye(3, batch_shape=[self.batch_size, self.element_count])
+            rotation = jnp.repeat(
+                jnp.repeat(jnp.eye(3)[None, None, ...], repeats=self.batch_size, axis=0),
+                repeats=self.element_count,
+                axis=1,
+            )
 
         # Compute a scale transformation if necessary:
         if ("s" in self._model_config.hparams.tx) and (self._model_config.hparams.r in ["aa", "cov"]):
             diag = self._radii[..., 0:3]
             diag = 1.0 / (jnp.sqrt(diag + 1e-8) + 1e-8)
-            scale = jnp.linalg.diag(diag)
+            diag_shape = diag.shape
+            diag = diag.reshape((-1, diag_shape[-1]))
+
+            scale = jax.vmap(jnp.diag, in_axes=0)(diag).reshape(diag_shape + (diag_shape[-1],))
         else:
-            scale = jnp.eye(3, batch_shape=[self.batch_size, self.element_count])
+            scale = jnp.repeat(
+                jnp.repeat(jnp.eye(3)[None, None, ...], repeats=self.batch_size, axis=0),
+                repeats=self.element_count,
+                axis=1,
+            )
 
         # Apply both transformations and return the transformed points.
         tx3x3 = jnp.matmul(scale, rotation)
@@ -786,8 +809,8 @@ class StructuredImplicit(object):
             effective_samples,
         )
 
-        assert per_element_constants.shape == tuple(batching_dims + [effective_element_count, sample_count, 1])
-        assert per_element_weights.shape == tuple(batching_dims + [effective_element_count, sample_count, 1])
+        assert per_element_constants.shape == batching_dims + (effective_element_count, sample_count, 1)
+        assert per_element_weights.shape == batching_dims + (effective_element_count, sample_count, 1)
 
         agg_fun_dict = {
             "s": jnp.sum,
@@ -812,7 +835,6 @@ class StructuredImplicit(object):
         if self._model_config.hparams.ipe in ["t", "e"]:
             effective_world2local = _tile_for_symgroups(self.world2local, self._model_config)
             local_samples = _transform_samples(effective_samples, effective_world2local)
-
             implicit_values = self.implicit_values(local_samples)
 
         if self._model_config.hparams.ipe == "t":

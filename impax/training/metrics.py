@@ -30,7 +30,7 @@ def point_iou(structured_implicit, sample_locations, sample_gt, model_config):
     pred_class, _ = structured_implicit.class_at_samples(sample_locations)
 
     gt_is_inside = jnp.logical_not(
-        sdf_util.apply_class_transfer(sample_gt, model_config, soft_transfer=False, offset=0.0, dtype=jnp.bool)
+        sdf_util.apply_class_transfer(sample_gt, model_config, soft_transfer=False, offset=0.0, dtype=bool)
     )
     pred_is_inside = pred_class < 0.5
     intersection = jnp.logical_and(gt_is_inside, pred_is_inside).astype(jnp.float32)
