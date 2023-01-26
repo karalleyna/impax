@@ -7,31 +7,31 @@ https://github.com/google/ldif/blob/master/ldif/util/path_util.py
 import os
 
 
-def get_path_to_ldif_root():
-    """Finds the LDIF root directory by assuming the script is at the root."""
+def get_path_to_impax_root():
+    """Finds the impax root directory by assuming the script is at the root."""
     expected_util = os.path.dirname(os.path.abspath(__file__))
     # Sanity check that the script lives in the root directory:
     if expected_util.split("/")[-1] != "utils":
         raise ValueError(
-            "Error: Script is not located in the LDIF package util folder, or the"
+            "Error: Script is not located in the impax package util folder, or the"
             f" util folder been renamed. Detected {os.path.abspath(__file__)}."
         )
-    ldif_root = "/".join(expected_util.split("/")[:-1])
-    if ldif_root.split("/")[-1] != "impax":
+    impax_root = "/".join(expected_util.split("/")[:-1])
+    if impax_root.split("/")[-1] != "impax":
         raise ValueError(
-            "Error: Util folder is no longer located in the LDIF root. Please"
+            "Error: Util folder is no longer located in the impax root. Please"
             " update util/path_util.py"
         )
-    return ldif_root
+    return impax_root
 
 
-def get_path_to_ldif_parent():
-    ldif_root = get_path_to_ldif_root()
-    return os.path.dirname(ldif_root)
+def get_path_to_impax_parent():
+    impax_root = get_path_to_impax_root()
+    return os.path.dirname(impax_root)
 
 
 def package_to_abs(path):
-    root = get_path_to_ldif_root()
+    root = get_path_to_impax_root()
     return os.path.join(root, path)
 
 
