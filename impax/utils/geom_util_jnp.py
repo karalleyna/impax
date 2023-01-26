@@ -85,14 +85,14 @@ def transform_normals(normals, tx):
     return jnp.reshape(transformed, [batch_size] + normal_shape + [3])
 
 
-def world_xyzn_im_to_pts(world_xyz, world_n):
+def world_xyzn_im_to_pts(world_xyz, world_n, key):
     """Makes a 10K long XYZN pointcloud from an XYZ image and a normal image."""
     # world im  + world normals -> world points+normals
     is_valid = jnp.logical_not(jnp.all(world_xyz == 0.0, axis=-1))
     world_xyzn = jnp.concatenate([world_xyz, world_n], axis=-1)
     world_xyzn = world_xyzn[is_valid, :]
     world_xyzn = jnp.reshape(world_xyzn, [-1, 6])
-    jnp.random.shuffle(world_xyzn)
+    world_xyzn = jnp.random.permutation(key, world_xyzn, independent=True)
     point_count = world_xyzn.shape[0]
     assert point_count > 0
     log.info("The number of valid samples is: %i" % point_count)

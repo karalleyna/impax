@@ -1,6 +1,7 @@
 """A wrapper for getting results from an experiment."""
 
 import os
+
 import jax.numpy as jnp
 
 # local
@@ -479,7 +480,7 @@ class ResultStore(object):
 
     def _mesh_relative_path(self, mesh_name):
         synset = mesh_name.split("|")[0]
-        mesh_hash = mesh_name[len(synset) + 1 :]
+        mesh_hash = mesh_name[len(synset) + 1:]
         path = "%s/%s.ply" % (synset, mesh_hash)
         return path
 

@@ -14,21 +14,29 @@ from impax.utils import geom_util
 
 importlib.reload(geom_util)
 
+global_key = random.PRNGKey(0)
 
-def random_shuffle_along_dim(x, dim, key=random.PRNGKey(0)):
+
+def get_next_key():
+    global global_key
+    global_key, key = random.split(global_key)
+    return key
+
+
+def random_shuffle_along_dim(x, dim, key=get_next_key()):
     """Randomly shuffles the elements of 'DeviceArray' along axis with index 'dim'."""
     if dim == 0:
-        return random.shuffle(key, x)
+        return random.permutation(key, x, independent=True)
     DeviceArray_rank = len(x.shape)
     axes = list(range(DeviceArray_rank))
     axes[dim], axes[0] = axes[0], axes[dim]
     x = jnp.transpose(x, axes=axes)
-    x = random.shuffle(key, x)
+    x = random.permutation(key, x, independent=True)
     x = jnp.transpose(x, axes=axes)
     return x
 
 
-def random_pan_rotations(batch_size, key=random.PRNGKey(0)):
+def random_pan_rotations(batch_size, key=get_next_key()):
     """Generates random 4x4 panning rotation matrices."""
     theta = random.uniform(key, shape=[batch_size], minval=0, maxval=2.0 * jnp.pi)
     z = jnp.zeros_like(theta)
@@ -39,7 +47,7 @@ def random_pan_rotations(batch_size, key=random.PRNGKey(0)):
     return jnp.reshape(m, [batch_size, 4, 4])
 
 
-def random_pan_rotation_jnp(key=random.PRNGKey(0)):
+def random_pan_rotation_jnp(key=get_next_key()):
     theta = random.uniform(key, maxval=2.0 * jnp.pi)
     m = jnp.array(
         [
@@ -53,7 +61,7 @@ def random_pan_rotation_jnp(key=random.PRNGKey(0)):
     return m
 
 
-def random_rotations(batch_size, key=random.PRNGKey(0)):
+def random_rotations(batch_size, key=get_next_key()):
     """Generates uniformly random 3x3 rotation matrices."""
     key0, key1, key2 = random.split(key, 3)
     theta = random.uniform(key0, shape=[batch_size], minval=0, maxval=2.0 * jnp.pi)
@@ -78,7 +86,7 @@ def random_rotations(batch_size, key=random.PRNGKey(0)):
     return rotation_to_tx(rotation_3x3)
 
 
-def random_rotation_jnp(key=random.PRNGKey(0)):
+def random_rotation_jnp(key=get_next_key()):
     """Returns a uniformly random SO(3) rotation as a [3,3] numpy array."""
     vals = random.uniform(key, shape=(3,))
     theta = vals[0] * 2.0 * jnp.pi
@@ -92,7 +100,7 @@ def random_rotation_jnp(key=random.PRNGKey(0)):
     return (jnp.outer(v, v) - jnp.eye(3)).dot(base_rot)
 
 
-def random_scales(batch_size, minval, maxval, key=random.PRNGKey(0)):
+def random_scales(batch_size, minval, maxval, key=get_next_key()):
     scales = random.uniform(key, shape=[batch_size, 3], minval=minval, maxval=maxval)
     hom_coord = jnp.ones([batch_size, 1], dtype=jnp.float32)
     scales = jnp.concatenate([scales, hom_coord], axis=1)

@@ -40,12 +40,10 @@ def write_depth_and_normals_npz(dirpath, path_out):
 def mesh_to_example(codebase_root_dir, mesh_path, dirpath, skip_existing):
     ldif_path = path_util.get_path_to_impax_root()
     if not skip_existing or not os.path.isfile(f"{dirpath}/depth_and_normals.npz"):
-        sp.check_output(
-            f"{codebase_root_dir}/scripts/process_mesh_local.sh {mesh_path} {dirpath} {ldif_path}", shell=True
-        )
+        sp.check_output([f"{codebase_root_dir}/scripts/process_mesh_local.sh", mesh_path, dirpath, ldif_path])
         write_depth_and_normals_npz(dirpath, f"{dirpath}/depth_and_normals.npz")
     else:
-        log.verbose(f"Skipping shell script processing for {dirpath}," " the output already exists.")
+        log.info(f"Skipping shell script processing for {dirpath}," " the output already exists.")
     # Precompute the dodeca samples for later:
     e = example.InferenceExample.from_directory(dirpath)
     sample_path = e.precomputed_surface_samples_from_dodeca_path
@@ -56,4 +54,4 @@ def mesh_to_example(codebase_root_dir, mesh_path, dirpath, skip_existing):
         assert precomputed_samples.shape[1] == 6
         file_util.write_points(sample_path, precomputed_samples)
     else:
-        log.verbose(f"Skipping surface sample precompution for {dirpath}, it's already done.")
+        log.info(f"Skipping surface sample precompution for {dirpath}, it's already done.")

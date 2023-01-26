@@ -5,6 +5,9 @@ __pycache__/
 
 # C extensions
 *.so
+impax/data/test
+impax/data/train
+impax/data/val
 impax/gaps
 ldif/
 *.obj

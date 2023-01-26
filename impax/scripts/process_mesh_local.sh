@@ -22,10 +22,6 @@ mkdir -p $outdir || true
 mesh_orig=${outdir}/mesh_orig.${mesh_in##*.}
 ln -s $mesh_in $mesh_orig
 
-echo $mesh_orig $mesh_in
-
-exit
-
 mesh=${outdir}/model_normalized.obj
 # Step 0) Normalize the mesh before applying all other operations.
 ${gaps}/msh2msh $mesh_orig $mesh -scale_by_pca -translate_by_centroid \
@@ -45,8 +41,7 @@ ${gaps}/msh2pts $mesh ${outdir}/uniform_points.sdf -uniform_in_bbox -bbox \
 
 # Step 4) Generate the depth renders:
 depth_dir=${outdir}/depth_images/
-${gaps}/scn2img $mesh $dodeca_path $depth_dir -capture_depth_images \
-$mesa -width 224 -height 224
+${gaps}/scn2img $mesh $dodeca_path $depth_dir -capture_depth_images $mesa -width 224 -height 224
 
 # The normalized mesh is no longer needed on disk; we have the transformation,
 # so if we need it we can load the original symlinked mesh and transform it
@@ -58,6 +53,5 @@ echo "dataset_processed" > $local_conf
 echo "depth_directory ${depth_dir}" >> $local_conf
 cat $conf_path >> $local_conf
 # TODO(kgenova) We have to write out normals as well?
-${gaps}/conf2img $local_conf ${outdir}/normals \
--create_normal_images -width 224 -height 224 $mesa
+${gaps}/conf2img $local_conf ${outdir}/normals -create_normal_images -width 224 -height 224 $mesa
 rm $local_conf

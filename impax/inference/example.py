@@ -11,16 +11,8 @@ from scipy.ndimage import interpolation
 
 # local
 from impax.inference import util as inference_util
-from impax.utils import (
-    file_util,
-    gaps_util,
-    geom_util,
-    geom_util_jnp,
-    jnp_util,
-    path_util,
-)
+from impax.utils import file_util, gaps_util, geom_util, geom_util_jnp, jnp_util, path_util
 from impax.utils.file_util import log
-
 
 synset_to_cat = {
     "02691156": "airplane",
@@ -50,7 +42,7 @@ def _parse_synset_or_cat(synset_or_cat):
         synset = synset_or_cat
     else:
         if synset_or_cat not in cat_to_synset:
-            log.verbose(
+            log.info(
                 f"{synset_or_cat} is not a recognized class or synset. If you"
                 " are not testing on shapenet-13 or a subset, this can be "
                 "safely ignored."
@@ -135,7 +127,7 @@ def _get_world_pts_from_idx(
     world_xyzn = jnp.concatenate([world_xyz, world_n], axis=-1)
     world_xyzn = world_xyzn[is_valid, :]
     world_xyzn = jnp.reshape(world_xyzn, [-1, 6])
-    world_xyzn = jax.random.shuffle(key, world_xyzn)
+    world_xyzn = jax.random.permutation(key, world_xyzn, independent=True)
     point_count = world_xyzn.shape[0]
     assert point_count > 0
     log.info("The number of valid samples for idx %i is: %i" % (idx, point_count))
@@ -170,12 +162,13 @@ class InferenceExample(object):
         self._normalized_gt_mesh = None
         self._r2n2_images = None
         self.depth_native_res = 224
+        self.key = None
 
         self.is_from_directory = False
 
         if dynamic:
             if verbose:
-                log.verbose(
+                log.info(
                     "Using dynamic files, not checking ahead for file existence."
                 )
         elif not file_util.exists(self.npz_path):
@@ -626,7 +619,7 @@ class InferenceExample(object):
         world_xyzn = jnp.concatenate([world_xyz, world_n], axis=-1)
         world_xyzn = world_xyzn[is_valid, :]
         world_xyzn = jnp.reshape(world_xyzn, [-1, 6])
-        world_xyzn = jax.random.shuffle(self.get_key, world_xyzn)
+        world_xyzn = jax.random.permutation(self.get_key, world_xyzn, independent=True)
         point_count = world_xyzn.shape[0]
         assert point_count > 0
         log.info("The number of valid samples for idx %i is: %i" % (idx, point_count))
@@ -645,7 +638,7 @@ class InferenceExample(object):
         world_xyzn = jnp.concatenate([world_xyz, world_n], axis=-1)
         world_xyzn = world_xyzn[is_valid, :]
         world_xyzn = jnp.reshape(world_xyzn, [-1, 6])
-        world_xyzn = jax.random.shuffle(self.get_key, world_xyzn)
+        world_xyzn = jax.random.permutation(self.get_key, world_xyzn, independent=True)
         point_count = world_xyzn.shape[0]
         assert point_count > 0
         log.info("The number of valid samples for idx %i is: %i" % (idx, point_count))
@@ -696,7 +689,7 @@ class InferenceExample(object):
             assert full_samples.dtype == jnp.float32
             assert full_samples.shape[0] > 1
             while full_samples.shape[0] < self.surface_sample_count:
-                log.verbose(
+                log.info(
                     f"Doubling samples from {full_samples.shape[0]} to"
                     f" {2*full_samples.shape[0]}"
                 )
@@ -721,10 +714,10 @@ class InferenceExample(object):
             world_xyzn = jnp.concatenate([world_xyz, world_n], axis=-1)
             world_xyzn = world_xyzn[is_valid, :]
             world_xyzn = jnp.reshape(world_xyzn, [-1, 6])
-            world_xyzn = jax.random.shuffle(self.get_key, world_xyzn)
+            world_xyzn = jax.random.permutation(self.get_key, world_xyzn, independent=True)
             assert world_xyzn.shape[0] > 1
             while world_xyzn.shape[0] < self.surface_sample_count:
-                log.verbose(
+                log.info(
                     f"Tiling samples from {world_xyzn.shape[0]} to"
                     f" {2*world_xyzn.shape[0]}"
                 )
@@ -736,7 +729,7 @@ class InferenceExample(object):
 
     def get_surface_samples(self, sample_count):
         pts = file_util.read_np(self.surface_samples_path)
-        pts = jax.random.shuffle(self.get_key, pts)
+        pts = jax.random.permutation(self.get_key, pts, independent=True)
         pts = pts[:sample_count, :]
         return pts
 

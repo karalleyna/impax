@@ -85,7 +85,7 @@ def process_one(f, mesh_directory, dataset_directory, skip_existing, log_level):
         raise ValueError(
             f"File with unsupported extension {extension} found: {f}." f" Only {valid_extensions} are supported."
         )
-    output_dir = f"{dataset_directory}/{split}/{synset}/{name}/"
+    output_dir = f"{dataset_directory}/{split}/{synset}/{name}"
     # This is the last file the processing writes, if it already exists the
     # example has already been processed.
     # todo: ? final_file_written = f"{output_dir}/depth_and_normals.npz"
