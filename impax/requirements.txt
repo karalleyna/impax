@@ -12,3 +12,4 @@ tensorflow-datasets
 tensorflow-graphics
 ml-collections
 optax
+tabulate

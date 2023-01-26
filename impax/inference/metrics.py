@@ -1,6 +1,6 @@
 """Computes metrics given predicted and ground truth shape."""
 
-import numpy as np
+import jax.numpy as jnp
 import pandas as pd
 import scipy
 import tabulate
@@ -105,7 +105,7 @@ def aggregate_extracted(csv_path_or_df):
 
 def sample_points_and_face_normals(mesh, sample_count):
     points, indices = mesh.sample(sample_count, return_index=True)
-    points = points.astype(np.float32)
+    points = points.astype(jnp.float32)
     normals = mesh.face_normals[indices]
     return points, normals
 
@@ -121,13 +121,13 @@ def dot_product(a, b):
         raise ValueError("Dot Product with input shape: %s" % repr(a.shape))
     if len(b.shape) != 2:
         raise ValueError("Dot Product with input shape: %s" % repr(b.shape))
-    return np.sum(a * b, axis=1)
+    return jnp.sum(a * b, axis=1)
 
 
 def point_iou(pred_is_inside, gt_is_inside):
-    intersection = np.logical_and(pred_is_inside, gt_is_inside).astype(np.float32)
-    union = np.logical_or(pred_is_inside, gt_is_inside).astype(np.float32)
-    iou = 100.0 * np.sum(intersection) / (np.sum(union) + 1e-05)
+    intersection = jnp.logical_and(pred_is_inside, gt_is_inside).astype(jnp.float32)
+    union = jnp.logical_or(pred_is_inside, gt_is_inside).astype(jnp.float32)
+    iou = 100.0 * jnp.sum(intersection) / (jnp.sum(union) + 1e-05)
     return iou
 
 
@@ -136,9 +136,9 @@ def point_metrics(element):
     if "iou_predictions" not in element:
         raise ValueError("IoU requested by iou samples were not computed.")
     gt_is_inside = None
-    example_np = element_to_example(element)
+    exmaple = element_to_example(element)
     pred_is_inside = element["iou_predictions"] < 0.5  # -0.07
-    gt_is_inside = np.reshape(example_np.uniform_samples[..., -1], [100000, 1]) < 0.0
+    gt_is_inside = jnp.reshape(exmaple.uniform_samples[..., -1], [100000, 1]) < 0.0
     element["iou"] = point_iou(pred_is_inside, gt_is_inside)
     return element
 
@@ -155,7 +155,7 @@ def element_to_example(element):
 
 
 def percent_below(dists, thresh):
-    return np.mean((dists**2 <= thresh).astype(np.float32)) * 100.0
+    return jnp.mean((dists**2 <= thresh).astype(jnp.float32)) * 100.0
 
 
 def f_score(a_to_b, b_to_a, thresh):
@@ -180,7 +180,7 @@ def mesh_chamfer_via_points(
     points1, points2 = get_points(mesh1, mesh2, points1, points2, sample_count)
     dist12, _ = pointcloud_neighbor_distances_indices(points1, points2)
     dist21, _ = pointcloud_neighbor_distances_indices(points2, points1)
-    chamfer = 1000.0 * (np.mean(dist12**2) + np.mean(dist21**2))
+    chamfer = 1000.0 * (jnp.mean(dist12**2) + jnp.mean(dist21**2))
     return chamfer
 
 
@@ -205,9 +205,9 @@ def normal_consistency(mesh1, mesh2, sample_count=100000, return_points=False):
     normals21 = normals1[indices21]
 
     # We take abs because the OccNet code takes abs...
-    nc12 = np.abs(dot_product(normals1, normals12))
-    nc21 = np.abs(dot_product(normals2, normals21))
-    nc = 0.5 * np.mean(nc12) + 0.5 * np.mean(nc21)
+    nc12 = jnp.abs(dot_product(normals1, normals12))
+    nc21 = jnp.abs(dot_product(normals2, normals21))
+    nc = 0.5 * jnp.mean(nc12) + 0.5 * jnp.mean(nc21)
     if return_points:
         return nc, points1, points2
     return nc
@@ -270,7 +270,7 @@ def all_mesh_metrics(mesh1, mesh2, sample_count=100000):
 def mesh_metrics(element):
     """Computes the chamfer distance and normal consistency metrics."""
     log.info("Metric step input: %s" % repr(element))
-    example_np = element_to_example(element)
+    example = element_to_example(element)
     if not element["mesh_str"]:
         raise ValueError(
             "Empty mesh string encountered for %s but mesh metrics required."
@@ -285,7 +285,7 @@ def mesh_metrics(element):
     sample_count = 100000
     points_pred, normals_pred = sample_points_and_face_normals(mesh, sample_count)
     points_gt, normals_gt = sample_points_and_face_normals(
-        example_np.gt_mesh, sample_count
+        example.gt_mesh, sample_count
     )
 
     pred_to_gt_dist, pred_to_gt_indices = pointcloud_neighbor_distances_indices(
@@ -299,15 +299,15 @@ def mesh_metrics(element):
     gt_to_pred_normals = normals_pred[gt_to_pred_indices]
 
     # We take abs because the OccNet code takes abs
-    pred_to_gt_normal_consistency = np.abs(
+    pred_to_gt_normal_consistency = jnp.abs(
         dot_product(normals_pred, pred_to_gt_normals)
     )
-    gt_to_pred_normal_consistency = np.abs(dot_product(normals_gt, gt_to_pred_normals))
+    gt_to_pred_normal_consistency = jnp.abs(dot_product(normals_gt, gt_to_pred_normals))
 
     # The 100 factor is because papers multiply by 100 for display purposes.
-    chamfer = 100.0 * (np.mean(pred_to_gt_dist**2) + np.mean(gt_to_pred_dist**2))
+    chamfer = 100.0 * (jnp.mean(pred_to_gt_dist**2) + jnp.mean(gt_to_pred_dist**2))
 
-    nc = 0.5 * np.mean(pred_to_gt_normal_consistency) + 0.5 * np.mean(
+    nc = 0.5 * jnp.mean(pred_to_gt_normal_consistency) + 0.5 * jnp.mean(
         gt_to_pred_normal_consistency
     )
 
@@ -319,8 +319,8 @@ def mesh_metrics(element):
     element["normal_consistency"] = nc
     element["f_score_tau"] = f_score_tau
     element["f_score_2tau"] = f_score_2tau
-    element["split"] = example_np.split
-    element["synset"] = example_np.synset
-    element["name"] = example_np.mesh_hash
-    element["class"] = example_np.cat
+    element["split"] = example.split
+    element["synset"] = example.synset
+    element["name"] = example.mesh_hash
+    element["class"] = example.cat
     return element
