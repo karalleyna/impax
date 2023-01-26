@@ -696,7 +696,7 @@ class InferenceExample(object):
                 full_samples = jnp.tile(full_samples, [2, 1])
             self._precomputed_surface_samples_from_dodeca = full_samples[
                 jax.random.choice(
-                    self.get_key, orig_count, self.surface_sample_count, replace=False
+                    self.get_key, jnp.arange(orig_count), shape=(self.surface_sample_count,), replace=False
                 ),
                 :,
             ]

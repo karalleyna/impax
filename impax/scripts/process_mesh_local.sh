@@ -7,7 +7,7 @@ ldif_root=$3
 
 dodeca_path=${ldif_root}/data/dodeca_cameras.cam
 conf_path=${ldif_root}/data/base_conf.conf
-gaps=${ldif_root}/gaps/bin/x86_64/
+gaps=${ldif_root}/gaps/bin/arm64/
 
 # On macos osmesa is not used, on linux it is:
 if [[ $(uname -s) == Darwin* ]]

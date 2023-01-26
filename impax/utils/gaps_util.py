@@ -10,6 +10,7 @@ import subprocess as sp
 import tempfile
 
 import jax.numpy as jnp
+import numpy as np
 
 
 from impax.utils import file_util
@@ -153,7 +154,7 @@ def read_pts_file(path):
     assert ext in [".sdf", ".pts"]
     l = 4 if ext == ".sdf" else 6
     with file_util.open_file(path, "rb") as f:
-        points = jnp.fromfile(f, dtype=jnp.float32)
+        points = np.fromfile(f, dtype=jnp.float32)
     points = jnp.reshape(points, [-1, l])
     return points
 

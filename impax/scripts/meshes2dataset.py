@@ -21,15 +21,15 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
     "mesh_directory",
-    "/mnt/e/Desktop/repos/impax/impax/data",
+    "/Users/burak/Desktop/repos/impax/impax/data",
     "Path to meshes. This folder should" " have the structure <root>/{train,test,val}/<class>/*.ply",
 )
 
-flags.DEFINE_string("dataset_directory", "/mnt/e/Desktop/repos/impax/impax/data", "Path to output dataset.")
+flags.DEFINE_string("dataset_directory", "/Users/burak/Desktop/repos/impax/impax/data", "Path to output dataset.")
 
 flags.DEFINE_boolean(
     "skip_existing",
-    True,
+    False,
     "Whether to skip process examples"
     " that are already written into the output dataset. True"
     " enables completing a processing run that crashed, or "
@@ -189,7 +189,7 @@ def main(argv):
                 options = tf.io.TFRecordOptions(tf.compat.v1.io.TFRecordCompressionType.GZIP)
                 with tf.io.TFRecordWriter(shard_name, options=options) as writer:
                     to_process = elements_of_split[start_idx:end_idx]
-                    serialized = Parallel(n_jobs=n_jobs)(delayed(serialize)(d, FLAGS.log_level) for d in to_process)
+                    serialized = Parallel(n_jobs=n_jobs)(delayed(serialize)(d) for d in to_process)
                     for s in serialized:
                         writer.write(s)
 

@@ -8,6 +8,7 @@ https://github.com/google/ldif/blob/master/ldif/util/jnp_util.py
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from skimage import measure
 from skimage.transform import resize
@@ -193,7 +194,7 @@ def plot_rbfs_at_thresh(centers, radii, thresh=0.5):
         canvas.draw()
         width, height = fig.get_size_inches() * fig.get_dpi()
         height, width = int(height), int(width)
-        image = jnp.fromstring(canvas.tostring_rgb(), dtype="uint8").reshape(
+        image = np.fromstring(canvas.tostring_rgb(), dtype="uint8").reshape(
             height, width, 3
         )
         outputs.append(image)
@@ -253,7 +254,7 @@ def plot_rbfs(centers, radii, scale=10.0):
         canvas.draw()
         width, height = fig.get_size_inches() * fig.get_dpi()
         height, width = int(height), int(width)
-        image = jnp.fromstring(canvas.tostring_rgb(), dtype="uint8").reshape(
+        image = np.fromstring(canvas.tostring_rgb(), dtype="uint8").reshape(
             height, width, 3
         )
         outputs.append(image)
@@ -331,7 +332,7 @@ def cube_and_render(volume, thresh):
         canvas.draw()
         width, height = fig.get_size_inches() * fig.get_dpi()
         height, width = int(height), int(width)
-        image = jnp.fromstring(canvas.tostring_rgb(), dtype="uint8").reshape(
+        image = np.fromstring(canvas.tostring_rgb(), dtype="uint8").reshape(
             height, width, 3
         )
     except ValueError:
