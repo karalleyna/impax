@@ -13,7 +13,7 @@ from impax.utils.model_utils import Encoder
 class EarlyFusionCNN(nn.Module):
     """A CNN that maps 1+ images with 1+ chanels to a feature vector."""
 
-    element_count: int
+    num_elements: int
     element_length: int
     architecture: str = "r18"
     batch_size: int = 32
@@ -54,15 +54,14 @@ class EarlyFusionCNN(nn.Module):
             )
             prediction = nn.leaky_relu(prediction)
 
-        prediction = nn.Dense(self.element_count * self.element_length)(prediction)
+        prediction = nn.Dense(self.num_elements * self.element_length)(prediction)
         prediction = jnp.reshape(
-            prediction, [batch_size, self.element_count, self.element_length]
+            prediction, [batch_size, self.num_elements, self.element_length]
         )
         return prediction, embedding
 
 
 class MidFusionCNN(nn.Module):
-    observation: Any
     num_elements: int
     element_length: int
     batch_size: int = 32
@@ -72,7 +71,7 @@ class MidFusionCNN(nn.Module):
     """A CNN architecture that fuses individual image channels in the middle."""
 
     @nn.compact
-    def __call__(self, x) -> Any:
+    def __call__(self, x, cam_to_worlds) -> Any:
 
         batch_size = x.shape[0]
         individual_images = jnp.split(x, indices_or_sections=x.shape[1], axis=1)
@@ -93,9 +92,7 @@ class MidFusionCNN(nn.Module):
                     embedding, [self.batch_size, 3, embedding_length // 3]
                 )
                 embedding = jnp.pad(embedding, jnp.array([[0, 0], [0, 1], [0, 0]]))
-                cam2world_i = self.observation.cam_to_worlds[
-                    :, i, :, :
-                ]  # [bs, rc, 4, 4]
+                cam2world_i = cam_to_worlds[:, i, :, :]  # [bs, rc, 4, 4]
                 embedding = jnp.matmul(cam2world_i, embedding)
                 # embedding shape [bs, 4, embedding_length // 3]
                 embedding = jnp.reshape(
