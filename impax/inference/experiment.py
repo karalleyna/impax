@@ -1,10 +1,9 @@
 """A wrapper for getting results from an experiment."""
 
 import os
+import jax.numpy as jnp
 
-import numpy as np
-
-
+# local
 from impax.models.model import hparams as hparams_util
 from impax.utils import file_util, path_util
 from impax.utils.file_util import log
@@ -189,8 +188,8 @@ class Job(object):
                 % (k, self.checkpoint_count, k)
             )
         else:
-            chosen = np.linspace(start=0, stop=self.checkpoint_count, num=k)
-            chosen = np.clip(chosen.astype(np.int32), 0, self.checkpoint_count - 1)
+            chosen = jnp.linspace(start=0, stop=self.checkpoint_count, num=k)
+            chosen = jnp.clip(chosen.astype(jnp.int32), 0, self.checkpoint_count - 1)
             chosen = list(chosen)
             return [self.all_checkpoints[i] for i in chosen]
 
