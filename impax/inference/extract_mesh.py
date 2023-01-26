@@ -1,6 +1,6 @@
 """Converts a structured implicit function into a mesh."""
 
-import numpy as jnp
+import jax.numpy as jnp
 from skimage import measure
 import trimesh
 
