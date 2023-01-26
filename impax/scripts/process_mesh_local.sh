@@ -22,6 +22,10 @@ mkdir -p $outdir || true
 mesh_orig=${outdir}/mesh_orig.${mesh_in##*.}
 ln -s $mesh_in $mesh_orig
 
+echo $mesh_orig $mesh_in
+
+exit
+
 mesh=${outdir}/model_normalized.obj
 # Step 0) Normalize the mesh before applying all other operations.
 ${gaps}/msh2msh $mesh_orig $mesh -scale_by_pca -translate_by_centroid \
