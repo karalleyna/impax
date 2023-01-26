@@ -21,11 +21,11 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
     "mesh_directory",
-    "",
+    "/mnt/e/Desktop/repos/impax/impax/data",
     "Path to meshes. This folder should" " have the structure <root>/{train,test,val}/<class>/*.ply",
 )
 
-flags.DEFINE_string("dataset_directory", "", "Path to output dataset.")
+flags.DEFINE_string("dataset_directory", "/mnt/e/Desktop/repos/impax/impax/data", "Path to output dataset.")
 
 flags.DEFINE_boolean(
     "skip_existing",
@@ -77,7 +77,7 @@ def process_one(f, mesh_directory, dataset_directory, skip_existing, log_level):
     assert relpath[0] == "/"
     relpath = relpath[1:]
     split, synset = relpath.split("/")[:2]
-    log.verbose(f"The split is {split} and the synset is {synset}")
+    log.info(f"The split is {split} and the synset is {synset}")
     name = os.path.basename(f)
     name, extension = os.path.splitext(name)
     valid_extensions = [".ply"]
@@ -97,8 +97,8 @@ def process_one(f, mesh_directory, dataset_directory, skip_existing, log_level):
     return output_dir
 
 
-def serialize(example_dir, log_level):
-    d = process_elements.load_example_dict(example_dir, log_level)
+def serialize(example_dir):
+    d = process_elements.load_example_dict(example_dir)
     s = process_elements.make_tf_example(d)
     return s
 
@@ -107,7 +107,6 @@ def main(argv):
     if len(argv) > 1:
         raise app.UsageError("Too many command-line arguments.")
     random.seed(2077)
-    log.set_level(FLAGS.log_level)
 
     n_jobs = os.cpu_count()
     assert FLAGS.max_threads != 0
