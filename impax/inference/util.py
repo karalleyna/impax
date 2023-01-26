@@ -1,27 +1,11 @@
-# Copyright 2020 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# Lint as: python3
 """Inference utility functions."""
 
 import os
 import time
 
-# LDIF is an internal package, should be imported last.
-# pylint: disable=g-bad-import-order
+# local
 from impax.utils import file_util, logging_util, path_util
 
-# pylint: enable=g-bad-import-order
 
 synset_to_cat = {
     "02691156": "airplane",
@@ -49,14 +33,18 @@ def parse_xid_str(xidstr):
         try:
             xids.append(int(token))
         except Exception:
-            raise ValueError("Could not parse %s as an xid from string %s." % (token, xidstr))
+            raise ValueError(
+                "Could not parse %s as an xid from string %s." % (token, xidstr)
+            )
     return xids
 
 
 def ensure_split_valid(split):
     valid_splits = ["train", "test", "val"]
     if split not in valid_splits:
-        raise ValueError("Unrecognized split: %s not in %s." % (split, repr(valid_splits)))
+        raise ValueError(
+            "Unrecognized split: %s not in %s." % (split, repr(valid_splits))
+        )
 
 
 def ensure_category_valid(category):
@@ -78,7 +66,9 @@ def ensure_category_valid(category):
         "watercraft",
     ]
     if category not in valid_categories:
-        raise ValueError("Unrecognized category: %s not in %s." % (category, repr(valid_categories)))
+        raise ValueError(
+            "Unrecognized category: %s not in %s." % (category, repr(valid_categories))
+        )
 
 
 def ensure_synset_valid(synset):
@@ -109,7 +99,8 @@ def get_npz_paths(split, category, modifier=""):
     t = time.time()
     ensure_split_valid(split)
     filelist = os.path.join(
-        path_util.get_path_to_ldif_root(), "data/basedirs/%s-%s%s.txt" % (split, category, modifier)
+        path_util.get_path_to_ldif_root(),
+        "data/basedirs/%s-%s%s.txt" % (split, category, modifier),
     )
     try:
         filenames = file_util.readlines(filelist)

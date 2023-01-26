@@ -1,17 +1,3 @@
-# Copyright 2020 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# Lint as: python3
 """Computes metrics given predicted and ground truth shape."""
 
 import numpy as np
@@ -19,13 +5,10 @@ import pandas as pd
 import scipy
 import tabulate
 
-# ldif is an internal package, and should be imported last.
-# pylint: disable=g-bad-import-order
+# local
 from impax.inference import example
 from impax.utils import file_util, mesh_util
 from impax.utils.file_util import log
-
-# pylint: enable=g-bad-import-order
 
 OCCNET_FSCORE_EPS = 1e-09
 
@@ -61,7 +44,9 @@ def get_class(row):
     key = row["key"]
     if "|" in key:
         if len([x for x in key if x == "|"]) != 1:
-            raise ValueError(f"Couldn't parse {key} into class+mesh name using | delimiter.")
+            raise ValueError(
+                f"Couldn't parse {key} into class+mesh name using | delimiter."
+            )
         maybe_synset1, maybe_synset2 = key.split("|")
     else:
         maybe_synset1, maybe_synset2 = row["key"].split("/")[:2]
@@ -75,10 +60,17 @@ def get_class(row):
 
 
 def print_pivot_table(class_mean_df, metric_name, metric_pretty_print):
-    cmean = pd.pivot_table(class_mean_df, values=metric_name, index=["class"], columns=["xid"])
+    cmean = pd.pivot_table(
+        class_mean_df, values=metric_name, index=["class"], columns=["xid"]
+    )
     log.info(
         "%s:\n%s"
-        % (metric_pretty_print, tabulate.tabulate(cmean, headers="keys", tablefmt="fancy_grid", floatfmt=".3f"))
+        % (
+            metric_pretty_print,
+            tabulate.tabulate(
+                cmean, headers="keys", tablefmt="fancy_grid", floatfmt=".3f"
+            ),
+        )
     )
 
 
@@ -98,8 +90,16 @@ def aggregate_extracted(csv_path_or_df):
     mean_of_means["class"] = "mean"
 
     final = class_means.append(mean_of_means, ignore_index=True)
-    log.info("\n" + tabulate.tabulate(final, headers="keys", tablefmt="fancy_grid", floatfmt=".3f"))
-    log.info("\n" + tabulate.tabulate(final, headers="keys", tablefmt="latex", floatfmt=".3f"))
+    log.info(
+        "\n"
+        + tabulate.tabulate(
+            final, headers="keys", tablefmt="fancy_grid", floatfmt=".3f"
+        )
+    )
+    log.info(
+        "\n"
+        + tabulate.tabulate(final, headers="keys", tablefmt="latex", floatfmt=".3f")
+    )
     return final
 
 
@@ -145,7 +145,9 @@ def point_metrics(element):
 
 def element_to_example(element):
     if "rgb_path" in element:
-        return example.InferenceExample.from_rgb_path_and_split(element["rgb_path"], element["split"])
+        return example.InferenceExample.from_rgb_path_and_split(
+            element["rgb_path"], element["split"]
+        )
     elif "npz_path" in element:
         return example.InferencExample.from_npz_path(element["npz_path"])
     else:
@@ -172,7 +174,9 @@ def fscore(mesh1, mesh2, sample_count=100000, tau=1e-04, points1=None, points2=N
     return f_score_tau
 
 
-def mesh_chamfer_via_points(mesh1, mesh2, sample_count=100000, points1=None, points2=None):
+def mesh_chamfer_via_points(
+    mesh1, mesh2, sample_count=100000, points1=None, points2=None
+):
     points1, points2 = get_points(mesh1, mesh2, points1, points2, sample_count)
     dist12, _ = pointcloud_neighbor_distances_indices(points1, points2)
     dist21, _ = pointcloud_neighbor_distances_indices(points2, points1)
@@ -220,15 +224,25 @@ def print_mesh_metrics(pred_mesh, gt_mesh, sample_count=100000):
 def compute_all(sif_vector, decoder, e, resolution=256, sample_count=100000):
     """Computes iou, f-score, f-score (2*tau), normal consistency, and chamfer."""
     iou = decoder.iou(sif_vector, e)
-    pred_mesh, had_crossing = decoder.extract_mesh(sif_vector, resolution=resolution, return_success=True)
+    pred_mesh, had_crossing = decoder.extract_mesh(
+        sif_vector, resolution=resolution, return_success=True
+    )
     if had_crossing:
         pred_mesh_occnet_frame = pred_mesh.apply_transform(e.gaps_to_occnet)
     else:
         # We just have a sphere, don't try to un-normalize it:
         pred_mesh_occnet_frame = pred_mesh
     gt_mesh_occnet_frame = e.gt_mesh
-    nc, fst, fs2t, chamfer = all_mesh_metrics(pred_mesh_occnet_frame, gt_mesh_occnet_frame, sample_count)
-    return {"iou": iou, "f_score_tau": fst, "f_score_2tau": fs2t, "chamfer": chamfer, "normal_c": nc}
+    nc, fst, fs2t, chamfer = all_mesh_metrics(
+        pred_mesh_occnet_frame, gt_mesh_occnet_frame, sample_count
+    )
+    return {
+        "iou": iou,
+        "f_score_tau": fst,
+        "f_score_2tau": fs2t,
+        "chamfer": chamfer,
+        "normal_c": nc,
+    }
 
 
 def print_all(sif_vector, decoder, e, resolution=256, sample_count=100000):
@@ -244,7 +258,9 @@ def print_all(sif_vector, decoder, e, resolution=256, sample_count=100000):
 
 
 def all_mesh_metrics(mesh1, mesh2, sample_count=100000):
-    nc, points1, points2 = normal_consistency(mesh1, mesh2, sample_count, return_points=True)
+    nc, points1, points2 = normal_consistency(
+        mesh1, mesh2, sample_count, return_points=True
+    )
     fs_tau = fscore(mesh1, mesh2, sample_count, 1e-04, points1, points2)
     fs_2tau = fscore(mesh1, mesh2, sample_count, 2.0 * 1e-04, points1, points2)
     chamfer = mesh_chamfer_via_points(mesh1, mesh2, sample_count, points1, points2)
@@ -256,29 +272,44 @@ def mesh_metrics(element):
     log.info("Metric step input: %s" % repr(element))
     example_np = element_to_example(element)
     if not element["mesh_str"]:
-        raise ValueError("Empty mesh string encountered for %s but mesh metrics required." % repr(element))
+        raise ValueError(
+            "Empty mesh string encountered for %s but mesh metrics required."
+            % repr(element)
+        )
     mesh = mesh_util.deserialize(element["mesh_str"])
     if mesh.is_empty:
-        raise ValueError("Empty mesh encountered for %s but mesh metrics required." % repr(element))
+        raise ValueError(
+            "Empty mesh encountered for %s but mesh metrics required." % repr(element)
+        )
 
     sample_count = 100000
     points_pred, normals_pred = sample_points_and_face_normals(mesh, sample_count)
-    points_gt, normals_gt = sample_points_and_face_normals(example_np.gt_mesh, sample_count)
+    points_gt, normals_gt = sample_points_and_face_normals(
+        example_np.gt_mesh, sample_count
+    )
 
-    pred_to_gt_dist, pred_to_gt_indices = pointcloud_neighbor_distances_indices(points_pred, points_gt)
-    gt_to_pred_dist, gt_to_pred_indices = pointcloud_neighbor_distances_indices(points_gt, points_pred)
+    pred_to_gt_dist, pred_to_gt_indices = pointcloud_neighbor_distances_indices(
+        points_pred, points_gt
+    )
+    gt_to_pred_dist, gt_to_pred_indices = pointcloud_neighbor_distances_indices(
+        points_gt, points_pred
+    )
 
     pred_to_gt_normals = normals_gt[pred_to_gt_indices]
     gt_to_pred_normals = normals_pred[gt_to_pred_indices]
 
     # We take abs because the OccNet code takes abs
-    pred_to_gt_normal_consistency = np.abs(dot_product(normals_pred, pred_to_gt_normals))
+    pred_to_gt_normal_consistency = np.abs(
+        dot_product(normals_pred, pred_to_gt_normals)
+    )
     gt_to_pred_normal_consistency = np.abs(dot_product(normals_gt, gt_to_pred_normals))
 
     # The 100 factor is because papers multiply by 100 for display purposes.
     chamfer = 100.0 * (np.mean(pred_to_gt_dist**2) + np.mean(gt_to_pred_dist**2))
 
-    nc = 0.5 * np.mean(pred_to_gt_normal_consistency) + 0.5 * np.mean(gt_to_pred_normal_consistency)
+    nc = 0.5 * np.mean(pred_to_gt_normal_consistency) + 0.5 * np.mean(
+        gt_to_pred_normal_consistency
+    )
 
     tau = 1e-04
     f_score_tau = f_score(pred_to_gt_dist, gt_to_pred_dist, tau)
