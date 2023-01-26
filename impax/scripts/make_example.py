@@ -38,7 +38,7 @@ def write_depth_and_normals_npz(dirpath, path_out):
 
 
 def mesh_to_example(codebase_root_dir, mesh_path, dirpath, skip_existing):
-    ldif_path = path_util.get_path_to_ldif_root()
+    ldif_path = path_util.get_path_to_impax_root()
     if not skip_existing or not os.path.isfile(f"{dirpath}/depth_and_normals.npz"):
         sp.check_output(
             f"{codebase_root_dir}/scripts/process_mesh_local.sh {mesh_path} {dirpath} {ldif_path}", shell=True

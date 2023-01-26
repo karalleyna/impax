@@ -5,9 +5,10 @@ __pycache__/
 
 # C extensions
 *.so
-
+impax/gaps
 ldif/
-
+*.obj
+*.ply
 # Distribution / packaging
 .Python
 build/

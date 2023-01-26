@@ -13,21 +13,19 @@ from impax.utils.file_util import log
 # pylint: enable=g-bad-import-order
 
 
-def load_example_dict(example_directory, log_level=None):
+def load_example_dict(example_directory):
     """Loads an example from disk and makes a str:numpy dictionary out of it."""
-    if log_level:
-        log.set_level(log_level)
     entry_t = time.time()
     start_t = entry_t  # Keep the function entry time around for a cumulative print.
     e = example.InferenceExample.from_directory(example_directory, verbose=False)
     end_t = time.time()
-    log.verbose(f"Make example: {end_t - start_t}")
+    log.info(f"Make example: {end_t - start_t}")
     start_t = end_t
 
     # The from_directory method should probably optionally take in a synset.
     bounding_box_samples = e.uniform_samples
     end_t = time.time()
-    log.verbose(f"Bounding box: {end_t - start_t}")
+    log.info(f"Bounding box: {end_t - start_t}")
     start_t = end_t
     # TODO(kgenova) There is a pitfall here where the depth is divided by 1000,
     # after this. So if some other depth images are provided, they would either
@@ -37,34 +35,34 @@ def load_example_dict(example_directory, log_level=None):
     assert depth_renders.shape[0] == 1
     depth_renders = depth_renders[0, ...]
     end_t = time.time()
-    log.verbose(f"Depth renders: {end_t - start_t}")
+    log.info(f"Depth renders: {end_t - start_t}")
     start_t = end_t
 
     mesh_name = e.mesh_name
     end_t = time.time()
-    log.verbose(f"Mesh name: {end_t - start_t}")
+    log.info(f"Mesh name: {end_t - start_t}")
     start_t = end_t
 
-    log.verbose(f"Loading {mesh_name} from split {e.split}")
+    log.info(f"Loading {mesh_name} from split {e.split}")
     near_surface_samples = e.near_surface_samples
     end_t = time.time()
-    log.verbose(f"NSS: {end_t - start_t}")
+    log.info(f"NSS: {end_t - start_t}")
 
     start_t = end_t
     grid = e.grid
     end_t = time.time()
-    log.verbose(f"Grid: {end_t - start_t}")
+    log.info(f"Grid: {end_t - start_t}")
     start_t = end_t
 
     world2grid = e.world2grid
     end_t = time.time()
-    log.verbose(f"world2grid: {end_t - start_t}")
+    log.info(f"world2grid: {end_t - start_t}")
     start_t = end_t
 
     surface_point_samples = e.precomputed_surface_samples_from_dodeca
     end_t = time.time()
-    log.verbose(f"surface points: {end_t - start_t}")
-    log.verbose(f"load_example_dict total time: {end_t - entry_t}")
+    log.info(f"surface points: {end_t - start_t}")
+    log.info(f"load_example_dict total time: {end_t - entry_t}")
     return {
         "bounding_box_samples": bounding_box_samples,
         "depth_renders": depth_renders,
