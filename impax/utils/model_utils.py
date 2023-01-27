@@ -18,7 +18,7 @@ class TwinInference(nn.Module):
     flat_element_length: int
 
     @nn.compact
-    def __call__(self, x):
+    def __call__(self, observation):
         remaining_length = self.flat_element_length - self.element_embedding_length
         if remaining_length <= 0:
             log.warning("Using less-tested option: single-tower in twin-tower.")
@@ -29,16 +29,12 @@ class TwinInference(nn.Module):
         assert self.element_embedding_length > 10
         # "Unsafe code: May not be possible to determine. Presence/absence of implicit parameters."
 
-        # todo: work on this inference fn
-        prediction, embedding = self.inference_fn(
-            x, self.element_count, explicit_embedding_length
-        )  # TODO, model_config)
+        prediction, embedding = self.inference_fn(observation, explicit_embedding_length)
 
         if remaining_length > 0:
             implicit_parameters, implicit_embedding = self.inference_fn(
-                x,
-                self.element_count,
-                self.element_embedding_length,  # TODO, model_config)
+                observation,
+                self.element_embedding_length,
             )
             prediction = jnp.concat([prediction, implicit_parameters], axis=2)
             embedding = jnp.concat([embedding, implicit_embedding], axis=1)
@@ -130,9 +126,7 @@ class Decoder(nn.Module):
             x = nn.BatchNorm(self.use_running_average)(x)
             x = self.activation(x)
 
-        x = nn.Dense(
-            spatial_shapes[-1][1] * spatial_shapes[-1][2] * spatial_shapes[-1][3]
-        )(x)
+        x = nn.Dense(spatial_shapes[-1][1] * spatial_shapes[-1][2] * spatial_shapes[-1][3])(x)
         x = nn.BatchNorm(self.use_running_average)(x)
         x = self.activation(x)
 

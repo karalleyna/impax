@@ -8,7 +8,6 @@ import tensorflow as tf
 # LDIF is an internal package, should be imported last.
 # pylint: disable=g-bad-import-order
 from impax.datasets import process_elements
-from impax.inference import example
 from impax.utils.file_util import log
 
 # pylint: enable=g-bad-import-order
@@ -28,12 +27,14 @@ def _make_optimized_dataset(directory, batch_size, mode, split):
     dataset = dataset.map(process_elements.parse_tf_example, num_parallel_calls=os.cpu_count())
 
     dataset = dataset.batch(batch_size, drop_remainder=True).prefetch(1)
-    dataset_items = next(iter(dataset))
-    return build_dataset_obj(dataset_items, batch_size)
+    for data in iter(dataset):
+        yield build_dataset_obj(data, batch_size)
 
 
 def build_dataset_obj(dataset_items, bs):
-    dataset_obj = lambda: 0
+    def dataset_obj():
+        return 0
+
     dataset_obj.bounding_box_samples = tf.ensure_shape(dataset_items[0], [bs, 100000, 4])
     dataset_obj.depth_renders = tf.ensure_shape(dataset_items[1], [bs, 20, 224, 224, 1])
     dataset_obj.mesh_name = dataset_items[2]

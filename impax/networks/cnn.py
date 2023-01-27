@@ -1,12 +1,12 @@
 """A simple feed forward CNN."""
 from typing import Any
 
-from flax import linen as nn
 import jax.numpy as jnp
+from flax import linen as nn
 
+from impax.networks.resnet_v2 import ResNet
 # local
 from impax.utils.logging_util import log
-from impax.networks.resnet_v2 import ResNet
 from impax.utils.model_utils import Encoder
 
 
@@ -14,13 +14,14 @@ class EarlyFusionCNN(nn.Module):
     """A CNN that maps 1+ images with 1+ chanels to a feature vector."""
 
     num_elements: int
-    element_length: int
     architecture: str = "r18"
     batch_size: int = 32
     use_running_average: bool = True
 
     @nn.compact
-    def __call__(self, x) -> Any:
+    def __call__(self, observation, element_length: int) -> Any:
+        x = observation.tensor
+        
         batch_size, num_images, height, width, num_channels = x.shape
         log.warning(f"Input shape to early-fusion cnn: {x.shape}")
 
@@ -42,7 +43,7 @@ class EarlyFusionCNN(nn.Module):
             )(x)
         elif self.architecture in ["r18", "r50", "h50", "k50", "s50"]:
             embedding = ResNet(
-                [64, 128, 256, 512],
+                [64, 128, 256, 512], return_intermediates=False
             )(x)
             embedding = jnp.reshape(embedding, [batch_size, -1])
 
@@ -54,24 +55,25 @@ class EarlyFusionCNN(nn.Module):
             )
             prediction = nn.leaky_relu(prediction)
 
-        prediction = nn.Dense(self.num_elements * self.element_length)(prediction)
+        prediction = nn.Dense(self.num_elements * element_length)(prediction)
         prediction = jnp.reshape(
-            prediction, [batch_size, self.num_elements, self.element_length]
+            prediction, [batch_size, self.num_elements, element_length]
         )
         return prediction, embedding
 
 
 class MidFusionCNN(nn.Module):
     num_elements: int
-    element_length: int
-    batch_size: int = 32
+    batch_size: int
+    cam_to_worlds: jnp.array
     rotate: bool = True
     use_running_average: bool = True
 
     """A CNN architecture that fuses individual image channels in the middle."""
 
     @nn.compact
-    def __call__(self, x, cam_to_worlds) -> Any:
+    def __call__(self, observation, element_length: int) -> Any:
+        x = observation.tensor
 
         batch_size = x.shape[0]
         individual_images = jnp.split(x, indices_or_sections=x.shape[1], axis=1)
@@ -92,7 +94,7 @@ class MidFusionCNN(nn.Module):
                     embedding, [self.batch_size, 3, embedding_length // 3]
                 )
                 embedding = jnp.pad(embedding, jnp.array([[0, 0], [0, 1], [0, 0]]))
-                cam2world_i = cam_to_worlds[:, i, :, :]  # [bs, rc, 4, 4]
+                cam2world_i = self.cam_to_worlds[:, i, :, :]  # [bs, rc, 4, 4]
                 embedding = jnp.matmul(cam2world_i, embedding)
                 # embedding shape [bs, 4, embedding_length // 3]
                 embedding = jnp.reshape(
@@ -113,8 +115,8 @@ class MidFusionCNN(nn.Module):
                 prediction
             )
             prediction = nn.leaky_relu(prediction)
-        prediction = nn.Dense(self.num_elements * self.element_length)(prediction)
+        prediction = nn.Dense(self.num_elements * element_length)(prediction)
         prediction = jnp.reshape(
-            prediction, [batch_size, self.num_elements, self.element_length]
+            prediction, [batch_size, self.num_elements, element_length]
         )
         return prediction, embedding

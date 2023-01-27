@@ -1,4 +1,5 @@
 import ml_collections
+
 from impax.configs import autoencoder
 
 
@@ -71,8 +72,9 @@ def get_config():
     config = autoencoder.get_config()
     config.input_height = 137
     config.input_width = 137
+    config.proto = "ShapeNetNSSDodecaSparseLRGMediumSlimPC"
     config.sampling_scheme = "im1dpn"
-    config.implicit_architecture = "1"
+    config.implicit_architecture = "2"
     config.cnn_architecture = "cnn"
     config.num_shape_elements = 100
     config.num_blobs = 0
@@ -82,7 +84,7 @@ def get_config():
     config.num_sample_points = 3000
     config.balanced = False
     config.batch_size = 16
-    config.implicit_parameter_length = 0
+    config.implicit_parameter_length = 11
     config.enable_implicit_parameters = False
     config.upweighting_factor = 10.0
     config.upweight = True

@@ -1,26 +1,29 @@
+import jax.numpy as jnp
+
+
 class Observation(object):
     """An observation that is seen by a network."""
 
     def __init__(self, model_config, training_example):
         # Auxiliaries:
-        sampling_scheme = model_config.hparams.sampling_scheme
+        sampling_scheme = model_config.sampling_scheme
         if "p" in sampling_scheme:
             # Then we have access to a point cloud as well:
-            self._surface_points = training_example.all_surface_points
+            self._surface_points = jnp.array(training_example.all_surface_points.numpy())
             sampling_scheme = sampling_scheme.replace("p", "")
         if "q" in sampling_scheme:
-            self._surface_points = training_example.all_surface_points_from_depth
+            self._surface_points = jnp.array(training_example.all_surface_points_from_depth.numpy())
             sampling_scheme = sampling_scheme.replace("q", "")
         if "n" in sampling_scheme:
             # Then we have access to normals:
             if "q" in sampling_scheme:
                 raise ValueError("Can't combine normals with xyz from depth.")
-            self._normals = training_example.all_normals
+            self._normals = jnp.array(training_example.all_normals.numpy())
             sampling_scheme = sampling_scheme.replace("n", "")
         else:
             self._normals = None
         # Main input:
-        idx = model_config.hparams.index_of_dodecahedron
+        idx = model_config.index_of_dodecahedron
         if sampling_scheme == "imd":
             tensor = training_example.depth_renders
             num_images = 20
@@ -35,31 +38,25 @@ class Observation(object):
             channel_count = 3
         elif sampling_scheme == "im1d":
             if "ShapeNetNSSDodecaSparseLRGMediumSlimPC" in training_example.proto_name:
-                tensor = training_example.depth_renders[:, idx : idx + 1, ...]
-            elif (
-                training_example.proto_name == "ShapeNetOneImXyzPC"
-                or "Waymo" in training_example.proto_name
-            ):
+                tensor = training_example.depth_renders[:, idx: idx + 1, ...]
+            elif training_example.proto_name == "ShapeNetOneImXyzPC" or "Waymo" in training_example.proto_name:
                 tensor = training_example.depth_render
             num_images = 1
             channel_count = 1
         elif sampling_scheme == "im1l":
-            tensor = training_example.lum_renders[:, idx : idx + 1, ...]
+            tensor = training_example.lum_renders[:, idx: idx + 1, ...]
             num_images = 1
             channel_count = 1
         elif sampling_scheme == "im1xyz":
             if "ShapeNetNSSDodecaSparseLRGMediumSlimPC" in training_example.proto_name:
-                tensor = training_example.xyz_renders[:, idx : idx + 1, ...]
-            elif (
-                training_example.proto_name == "ShapeNetOneImXyzPC"
-                or "Waymo" in training_example.proto_name
-            ):
+                tensor = training_example.xyz_renders[:, idx: idx + 1, ...]
+            elif training_example.proto_name == "ShapeNetOneImXyzPC" or "Waymo" in training_example.proto_name:
                 tensor = training_example.xyz_render
             num_images = 1
             channel_count = 3
         elif sampling_scheme == "imrd":
             tensor = training_example.random_depth_images
-            num_images = model_config.hparams.rc
+            num_images = model_config.rc
             channel_count = 1
         elif sampling_scheme == "imrxyz":
             tensor = training_example.random_xyz_render
@@ -74,18 +71,16 @@ class Observation(object):
             channel_count = 1
             tensor = training_example.lum_renders
         else:
-            raise ValueError(
-                "Unrecognized samp: %s -> %s"
-                % (model_config.hparams.samp, sampling_scheme)
-            )
-        tensor = tensor.reshape(
+            raise ValueError("Unrecognized samp: %s -> %s" % (model_config.samp, sampling_scheme))
+        tensor = jnp.reshape(
+            tensor.numpy(),
             [
-                model_config.hparams.batch_size,
+                model_config.batch_size,
                 num_images,
-                model_config.hparams.height,
-                model_config.hparams.width,
+                model_config.input_height,
+                model_config.input_width,
                 channel_count,
-            ]
+            ],
         )
         self._tensor = tensor
         self._one_image_one_channel_tensor = None

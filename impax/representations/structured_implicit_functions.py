@@ -1,10 +1,10 @@
 """A class for an instance of a structured implicit function."""
 
-import math
 import time
 
 import jax
 import jax.numpy as jnp
+from jax import nn
 
 from impax.representations import quadrics
 from impax.utils import camera_util, geom_util, jax_util, jnp_util, sdf_util
@@ -16,8 +16,8 @@ RADII_EPS = 1e-10
 def _unflatten(vector, model_config):
     """Given a flat shape vector, separates out the individual parameter sets."""
     radius_shape = element_radius_shape(model_config)
-    radius_len = int(jnp.prod(radius_shape))
-    assert len(radius_shape) == 1  # If the radius is a >1 rank tensor, unpack it.
+    radius_len = radius_shape
+    # assert len(radius_shape) == 1  # If the radius is a >1 rank tensor, unpack it.
     explicit_param_count = 1  # A single constant.
     # First, determine if there are implicit parameters present.
     total_explicit_length = explicit_param_count + 3 + radius_len
@@ -25,7 +25,7 @@ def _unflatten(vector, model_config):
     # log.info('Provided len, explicit len: %i, %i' %
     # (provided_length, total_explicit_length))
     if provided_length > total_explicit_length:
-        expected_implicit_length = model_config.hparams.ips
+        expected_implicit_length = model_config.implicit_parameter_length
         leftover_length = provided_length - total_explicit_length
         if leftover_length != expected_implicit_length:
             raise ValueError(
@@ -54,30 +54,20 @@ def element_explicit_dof(model_config):
     center_dof = 3  # in R^3
 
     # Radius:
-    if model_config.hparams.r == "iso":
+    if model_config.coordinates == "iso":
         radius_dof = 1
-    elif model_config.hparams.r == "aa":
+    elif model_config.coordinates == "aa":
         radius_dof = 3
-    elif model_config.hparams.r == "cov":
+    elif model_config.coordinates == "cov":
         radius_dof = 6
     else:
-        raise ValueError("Unrecognized radius hyperparameter: %s" % model_config.hparams.r)
+        raise ValueError("Unrecognized radius hyperparameter: %s" % model_config.coordinates)
     return constant_dof + center_dof + radius_dof
-
-    # Implicit Parameters:
-
-    # if model_config.hparams.ip == 'no':
-    #   ip_dof = 0
-    # elif model_config.hparams.ip == 'sb':
-    #   ip_dof = model_config.hparams.ips
-    # else:
-    #   raise ValueError('Unrecognized implicit parameter hyperparameter: %s' %
-    #                    model_config.hparams.ip)
 
 
 def element_implicit_dof(model_config):
-    if model_config.hparams.ipe != "f":
-        return model_config.hparams.ips
+    if model_config.enable_implicit_parameters:
+        return model_config.implicit_parameter_length
     return 0.0
 
 
@@ -99,29 +89,30 @@ def element_center_shape(model_config):
 
 
 def element_radius_shape(model_config):
-    if model_config.hparams.r == "iso":
-        return [1]
-    elif model_config.hparams.r == "aa":
-        return [3]
-    elif model_config.hparams.r == "cov":
-        return [6]
+    if model_config.coordinates == "iso":
+        return 1
+    elif model_config.coordinates == "aa":
+        return 3
+    elif model_config.coordinates == "cov":
+        return 6
     else:
-        raise ValueError("Unrecognized radius hyperparameter: %s" % model_config.hparams.r)
+        raise ValueError("Unrecognized radius hyperparameter: %s" % model_config.coordinates)
 
 
 def element_iparam_shape(model_config):
-    if model_config.hparams.ip == "no":
+    if model_config.implicit_parameters == "no":
         return []
-    elif model_config.hparams.ip == "bp":
-        return [model_config.hparams.ips]
+    elif model_config.implicit_parameters == "bp":
+        return [model_config.implicit_parameter_length]
     else:
-        raise ValueError("Unrecognized implicit parameter hyperparameter: %s" % model_config.hparams.ip)
+        raise ValueError("Unrecognized implicit parameter hyperparameter: %s" % model_config.implicit_parameters)
 
 
 def ensure_net_if_needed(net, model_config):
-    if model_config.hparams.ip != "no" and net is None:
+    if model_config.implicit_parameters != "no" and net is None:
         raise ValueError(
-            "Must provide network for sample decoding when using " "iparams (hparam ip=%s)." % model_config.hparams.ip
+            "Must provide network for sample decoding when using "
+            "iparams (hparam ip=%s)." % model_config.implicit_parameters
         )
 
 
@@ -129,25 +120,25 @@ def sigma(x, a):
     return x / jnp.sqrt(a * a + x * x)
 
 
-def ensure_jnp_shape(arr, expected_shape, name):
+def ensure_jnp_shape(x, expected_shape, name):
     """Verifies a numpy array matches the expected shape. Supports symbols."""
-    shape_ok = len(arr.shape) == len(expected_shape)
+    shape_ok = len(x.shape) == len(expected_shape)
     if shape_ok:
         symbols = {}
-        for i in range(len(arr.shape)):
+        for i in range(len(x.shape)):
             if isinstance(expected_shape[i], int) and expected_shape[i] != -1:
-                shape_ok = shape_ok and arr.shape[i] == expected_shape[i]
+                shape_ok = shape_ok and x.shape[i] == expected_shape[i]
             elif expected_shape[i] == -1:
                 continue
             else:
                 if expected_shape[i] in symbols:
-                    shape_ok = shape_ok and arr.shape[i] == symbols[expected_shape[i]]
+                    shape_ok = shape_ok and x.shape[i] == symbols[expected_shape[i]]
                 else:
-                    symbols[expected_shape[i]] = arr.shape[i]
+                    symbols[expected_shape[i]] = x.shape[i]
     else:
         raise ValueError(
             "Expected numpy array %s to have shape %s but it has shape %s."
-            % (name, str(expected_shape), str(arr.shape))
+            % (name, str(expected_shape), str(x.shape))
         )
 
 
@@ -166,7 +157,7 @@ class StructuredImplicitjnp(object):
         jnp_list = session.run(self._structured_implicit_tf.tensor_list, feed_dict=feed_dict)
         (self.element_constants, self.element_centers, self.element_radii) = jnp_list[:3]
         # pylint:disable=protected-access
-        if self._structured_implicit_tf._model_config.hparams.ipe != "f":
+        if self._structured_implicit_tf._model_config.enable_implicit_parameters != "f":
             # pylint:enable=protected-access
             # if len(jnp_list) == 4:
             self.element_iparams = jnp_list[3]
@@ -187,7 +178,7 @@ class StructuredImplicitjnp(object):
     def flat_vector(self):
         self.ensure_initialized()
         ls = [self.element_constants, self.element_centers, self.element_radii]
-        # if self._structured_implicit_tf._model_config.hparams.ipe == 't':
+        # if self._structured_implicit_tf._model_config.enable_implicit_parameters == 't':
         if self.element_iparams is not None:
             ls.append(self.element_iparams)
         return jnp.concatenate(ls, axis=-1)
@@ -321,11 +312,11 @@ def symgroup_equivalence_classes(model_config):
         sublist, and the sublists are sorted in ascending order.
     """
     # Populate with the root elements.
-    lists = [[i] for i in range(model_config.hparams.sc)]
+    lists = [[i] for i in range(model_config.num_shape_elements)]
 
-    left_right_sym_count = model_config.hparams.lyr
+    left_right_sym_count = model_config.num_blobs
     if left_right_sym_count:
-        start_idx = model_config.hparams.sc
+        start_idx = model_config.num_shape_elements
         for i in range(left_right_sym_count):
             idx = start_idx + i
             lists[i].extend(idx)
@@ -340,9 +331,9 @@ def symgroup_class_ids(model_config):
       A list of integers of length effective_element_count. Each element points to
       the 'true' (i.e. < shape count) identifier for each effective element
     """
-    ls = list(range(model_config.hparams.sc))
+    ls = list(range(model_config.num_shape_elements))
 
-    left_right_sym_count = model_config.hparams.lyr
+    left_right_sym_count = model_config.num_blobs
     if left_right_sym_count:
         ls.extend(list(range(left_right_sym_count)))
     return ls
@@ -358,7 +349,7 @@ def _tile_for_symgroups(elements, model_config):
       elements have been tiled according to the model configuration's symmetry
       group description.
     """
-    left_right_sym_count = model_config.hparams.lyr
+    left_right_sym_count = model_config.num_blobs
     assert len(elements.shape) >= 3
     # The first K elements get reflected with left-right symmetry (z-axis) as
     # needed.
@@ -370,7 +361,7 @@ def _tile_for_symgroups(elements, model_config):
 
 
 def get_effective_element_count(model_config):
-    return model_config.hparams.sc + model_config.hparams.lyr
+    return model_config.num_shape_elements + model_config.num_blobs
 
 
 def _generate_symgroup_samples(samples, model_config):
@@ -382,9 +373,9 @@ def _generate_symgroup_samples(samples, model_config):
       Tensor with shape [batch_size, effective_element_count, sample_count, 3].
     """
     assert len(samples.shape) == 3
-    samples = jax_util.tile_new_axis(samples, axis=1, length=model_config.hparams.sc)
+    samples = jax_util.tile_new_axis(samples, axis=1, length=model_config.num_shape_elements)
 
-    left_right_sym_count = model_config.hparams.lyr
+    left_right_sym_count = model_config.num_blobs
 
     if left_right_sym_count:
         first_k = samples[:, :left_right_sym_count, :]
@@ -448,24 +439,24 @@ class StructuredImplicit(object):
     def from_packed_vector(cls, packed_vector, net, model_config):
         """Parse an already packed vector (NOT a network activation)."""
         ensure_net_if_needed(net, model_config)
-        constant, center, radius, iparam = _unflatten(packed_vector)
+        constant, center, radius, iparam = _unflatten(packed_vector, model_config)
         return cls(constant, center, radius, iparam, net, model_config)
 
     @classmethod
     def from_activation(cls, activation, net, model_config):
         """Parse a network activation into a structured implicit function."""
         ensure_net_if_needed(net, model_config)
-        constant, center, radius, iparam = _unflatten(activation)
+        constant, center, radius, iparam = _unflatten(activation, model_config)
 
-        if model_config.hparams.cp == "a":
+        if model_config.prediction_mode == "a":
             constant = -jnp.abs(constant)
-        elif model_config.hparams.cp == "s":
-            constant = jax.nn.sigmoid(constant) - 1
-        radius_var = jax.nn.sigmoid(radius[..., 0:3])
+        elif model_config.prediction_mode == "s":
+            constant = nn.sigmoid(constant) - 1
+        radius_var = nn.sigmoid(radius[..., 0:3])
         max_blob_radius = 0.15
         radius_var *= max_blob_radius
         radius_var = radius_var * radius_var
-        if model_config.hparams.r == "cov":
+        if model_config.coordinates == "cov":
             # radius_rot = sigma(radius[..., 3:], 50.0)
             max_euler_angle = jnp.pi / 4.0
             radius_rot = jnp.clip(radius[..., 3:], -max_euler_angle, max_euler_angle)
@@ -478,13 +469,13 @@ class StructuredImplicit(object):
 
     def force_valid_values(self):
         self._constants = jnp.minimum(self._constants, -1e-10)
-        if self._model_config.hparams.r == "cov":
+        if self._model_config.coordinates == "cov":
             axisr, rotr = jnp.split(self._radii, [3], axis=-1)
             axisr = jnp.maximum(axisr, 1e-9)
             rotr = jnp.clip(rotr, -jnp.pi / 4.0, jnp.pi / 4.0)
             self._radii = jnp.concatenate([axisr, rotr], axis=-1)
         else:
-            assert self._model_config.hparams.r == "aa"
+            assert self._model_config.coordinates == "aa"
             self._radii = jnp.maximum(self._radii, 1e-9)
 
     @property
@@ -502,7 +493,7 @@ class StructuredImplicit(object):
         """A flattened vector with shape [batch_size, -1]."""
         if self._flat_vector is None:
             sc, sd = self.vector.shape[-2:]
-            self._flat_vector = jnp.reshape(self.vector, [self._model_config.hparams.bs, sc, sd])
+            self._flat_vector = jnp.reshape(self.vector, [self._model_config.batch_size, sc, sd])
         return self._flat_vector
 
     @property
@@ -586,7 +577,7 @@ class StructuredImplicit(object):
           No return.
         """
         sqrt_rads = jnp.sqrt(jnp.maximum(self._radii[..., 0:3], 0.0))
-        volumes = (4.0 / 3.0 * math.pi) * jnp.prod(sqrt_rads, axis=-1, keepdims=True)
+        volumes = (4.0 / 3.0 * jnp.pi) * jnp.prod(sqrt_rads, axis=-1, keepdims=True)
         should_zero = volumes < volume_threshold
         self._constants = jnp.where(should_zero, jnp.zeros_like(self._constants), self._constants)
 
@@ -608,7 +599,7 @@ class StructuredImplicit(object):
         """Adds LDIF embeddings to the SIF object."""
         ijnput_shape = iparams.shape
         expected_batch_dims = self.element_radii.shape[:-1]
-        expected_shape = expected_batch_dims + [self._model_config.hparams.ips]
+        expected_shape = expected_batch_dims + [self._model_config.implicit_parameter_length]
         if len(ijnput_shape) != len(expected_shape):
             raise ValueError(
                 "Trying to set iparams with incorrect rank: %s in but %s expected."
@@ -634,14 +625,14 @@ class StructuredImplicit(object):
         # We assume the center is an XYZ position for this transformation:
         # TODO(kgenova) Update this transformation to account for rotation.
 
-        if self._model_config.hparams.tx == "i":
+        if self._model_config.transformations == "i":
             return jnp.repeat(
                 jnp.repeat(jnp.eye(4)[None, None, ...], repeats=self.batch_size, axis=0),
                 repeats=self.element_count,
                 axis=1,
             )
 
-        if "c" in self._model_config.hparams.tx:
+        if "c" in self._model_config.transformations:
             tx = jnp.repeat(
                 jnp.repeat(jnp.eye(3)[None, None, ...], repeats=self.batch_size, axis=0),
                 repeats=self.element_count,
@@ -663,7 +654,7 @@ class StructuredImplicit(object):
             )
 
         # Compute a rotation transformation if necessary:
-        if ("r" in self._model_config.hparams.tx) and (self._model_config.hparams.r == "cov"):
+        if ("r" in self._model_config.transformations) and (self._model_config.coordinates == "cov"):
             # Apply the inverse rotation:
             rotation = jnp.linalg.inv(camera_util.roll_pitch_yaw_to_rotation_matrices(self._radii[..., 3:6]))
         else:
@@ -674,7 +665,7 @@ class StructuredImplicit(object):
             )
 
         # Compute a scale transformation if necessary:
-        if ("s" in self._model_config.hparams.tx) and (self._model_config.hparams.r in ["aa", "cov"]):
+        if ("s" in self._model_config.transformations) and (self._model_config.coordinates in ["aa", "cov"]):
             diag = self._radii[..., 0:3]
             diag = 1.0 / (jnp.sqrt(diag + 1e-8) + 1e-8)
             diag_shape = diag.shape
@@ -703,11 +694,11 @@ class StructuredImplicit(object):
             or something (like a scalar) that can broadcast to that type. The value
             decoded from the implicit parameters at each element.
         """
-        if self._model_config.hparams.ipe == "f":
+        if self._model_config.enable_implicit_parameters == "f":
             log.warning("Requesting implicit values when ipe='f'. iparams are None? %s" % repr(self._iparams is None))
             raise ValueError("Can't request implicit values when ipe='f'.")
-        elif self._model_config.hparams.ipe not in ["e", "t"]:
-            raise ValueError("Unrecognized ipe hparam: %s" % self._model_config.hparams.ipe)
+        elif self._model_config.enable_implicit_parameters not in ["e", "t"]:
+            raise ValueError("Unrecognized ipe hparam: %s" % self._model_config.enable_implicit_parameters)
         else:
             iparams = _tile_for_symgroups(self._iparams, self._model_config)
             eec = iparams.shape[-2]
@@ -718,8 +709,8 @@ class StructuredImplicit(object):
                 )
             values = self.net.eval_implicit_parameters(iparams, local_samples)
             # TODO(kgenova) Maybe this should be owned by a different piece of code?
-            if self._model_config.hparams.ipe == "e":
-                values = jax.nn.sigmoid(values)  # The parameters define a decision.
+            if self._model_config.enable_implicit_parameters == "e":
+                values = nn.sigmoid(values)  # The parameters define a decision.
             return values
 
     def rbf_influence_at_samples(self, samples):
@@ -815,12 +806,12 @@ class StructuredImplicit(object):
         agg_fun_dict = {
             "s": jnp.sum,
             "m": jnp.max,
-            "l": jax.nn.logsumexp,
+            "l": nn.logsumexp,
             "v": jnp.var,
         }
-        agg_fun = agg_fun_dict[self._model_config.hparams.ag]
+        agg_fun = agg_fun_dict[self._model_config.ag]
 
-        if self._model_config.hparams.ipe == "f":
+        if self._model_config.enable_implicit_parameters == "f":
             local_decisions = per_element_constants * per_element_weights
             local_weights = per_element_weights
             sdf = agg_fun(local_decisions, axis=batching_rank)
@@ -832,36 +823,36 @@ class StructuredImplicit(object):
         # [batch_size, element_count, sample_count, 3], while the current samples
         # have shape [batch_size, sample_count, 3]. This is because each sample
         # should be evaluated in the relative coordinate system of the
-        if self._model_config.hparams.ipe in ["t", "e"]:
+        if self._model_config.enable_implicit_parameters in ["t", "e"]:
             effective_world2local = _tile_for_symgroups(self.world2local, self._model_config)
             local_samples = _transform_samples(effective_samples, effective_world2local)
             implicit_values = self.implicit_values(local_samples)
 
-        if self._model_config.hparams.ipe == "t":
-            multiplier = 1.0 if self._model_config.hparams.ipc == "t" else 0.0
+        if self._model_config.enable_implicit_parameters == "t":
+            multiplier = 1.0 if self._model_config.debug_implicit_parameters == "t" else 0.0
             residuals = 1 + multiplier * implicit_values
             # Each element is c * w * (1 + OccNet(x')):
             local_decisions = per_element_constants * per_element_weights * residuals
             local_weights = per_element_weights
             sdf = agg_fun(local_decisions, axis=batching_rank)
 
-        if self._model_config.hparams.ipe in ["f", "t"]:
+        if self._model_config.enable_implicit_parameters in ["f", "t"]:
             # Need to map from the metaball influence to something that's < 0 inside.
             if apply_class_transfer:
                 sdf = sdf_util.apply_class_transfer(
                     sdf,
                     self._model_config,
                     soft_transfer=True,
-                    offset=self._model_config.hparams.lset,
+                    offset=self._model_config.lset,
                 )
 
-        if self._model_config.hparams.ipc != "t":
+        if self._model_config.debug_implicit_parameters != "t":
             return sdf, (local_decisions, local_weights)
 
-        if self._model_config.hparams.ipe == "e":
+        if self._model_config.enable_implicit_parameters == "e":
             local_decisions = implicit_values
             weighted_constants = per_element_weights * jnp.abs(per_element_constants)
-            occnet_weights = jax.nn.softmax(weighted_constants, axis=batching_rank)
+            occnet_weights = nn.softmax(weighted_constants, axis=batching_rank)
             sdf_components = occnet_weights * local_decisions
             local_weights = occnet_weights
             # This is the class at the samples. It is a probability of being outside.
