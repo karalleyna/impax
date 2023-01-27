@@ -905,7 +905,9 @@ def interpolate_from_grid_coordinates(samples, grid):
         x_coord = jnp.clip(x_coord, 0, width - 1)
         for yi, y_coord in enumerate([lower_coords[:, :, 1], upper_coords[:, :, 1]]):
             y_coord = jnp.clip(y_coord, 0, height - 1)
-            for zi, z_coord in enumerate([lower_coords[:, :, 2], upper_coords[:, :, 2]]):
+            for zi, z_coord in enumerate(
+                [lower_coords[:, :, 2], upper_coords[:, :, 2]]
+            ):
                 z_coord = jnp.clip(z_coord, 0, length - 1)
                 flat_lookup = z_coord * height * width + y_coord * width + x_coord
                 lookup_coords[xi][yi].append(flat_lookup)
@@ -937,4 +939,3 @@ def interpolate_from_grid_coordinates(samples, grid):
     p = jnp.reshape(p, [batch_size, num_samples, 1])
     validity_mask = jnp.reshape(validity_mask, [batch_size, num_samples, 1])
     return p, validity_mask
-

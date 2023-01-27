@@ -74,19 +74,27 @@ def hessian(sdf_im):
     sdf_im = jnp.reshape(sdf_im, [batch_size, height, width, 1])
     # pyformat: disable
     xx_fda_kernel = jnp.reshape(
-        jnp.array([[0.0, 0.0, 0.0], [1.0, -2.0, 1.0], [0.0, 0.0, 0.0]], dtype=jnp.float32),
+        jnp.array(
+            [[0.0, 0.0, 0.0], [1.0, -2.0, 1.0], [0.0, 0.0, 0.0]], dtype=jnp.float32
+        ),
         [3, 3, 1, 1],
     )
     yy_fda_kernel = jnp.reshape(
-        jnp.array([[0.0, 1.0, 0.0], [0.0, -2.0, 0.0], [0.0, 1.0, 0.0]], dtype=jnp.float32),
+        jnp.array(
+            [[0.0, 1.0, 0.0], [0.0, -2.0, 0.0], [0.0, 1.0, 0.0]], dtype=jnp.float32
+        ),
         [3, 3, 1, 1],
     )
     xy_fda_kernel = jnp.reshape(
-        jnp.array([[0.25, 0.0, -0.25], [0.0, 0.0, 0.0], [-0.25, 0.0, 0.25]], dtype=jnp.float32),
+        jnp.array(
+            [[0.25, 0.0, -0.25], [0.0, 0.0, 0.0], [-0.25, 0.0, 0.25]], dtype=jnp.float32
+        ),
         [3, 3, 1, 1],
     )
     # pyformat: enable
-    fda_kernel = jnp.concatenate([xx_fda_kernel, xy_fda_kernel, xy_fda_kernel, yy_fda_kernel], axis=3)
+    fda_kernel = jnp.concatenate(
+        [xx_fda_kernel, xy_fda_kernel, xy_fda_kernel, yy_fda_kernel], axis=3
+    )
     # NCHWD…, OIHWD…, NCHWD
     sdf_im = jnp.transpose(sdf_im, axes=[0, 3, 1, 2])
     fda_kernel = jnp.transpose(fda_kernel, axes=[3, 2, 0, 1])
@@ -111,7 +119,8 @@ def get_pil_formatted_image(image):
     height, width, channel_count = image.shape
     if channel_count != 1:
         raise ValueError(
-            "Single-channel input image was expected (dim 2), but " "input has shape %s" % (str(image.shape))
+            "Single-channel input image was expected (dim 2), but "
+            "input has shape %s" % (str(image.shape))
         )
     image = jnp.tile(image, [1, 1, 3])
     alpha = jnp.ones([height, width, 1], dtype=jnp.float32)
@@ -119,12 +128,15 @@ def get_pil_formatted_image(image):
     out = jnp.clip(255.0 * image, 0.0, 255.0).astype(jnp.uint8).copy(order="K")
     if out.shape[0] != height or out.shape[1] != width or out.shape[2] != 4:
         raise AssertionError(
-            "Internal error: output shape should be (%i, %i, 4) but " "is %s" % (height, width, str(out.shape))
+            "Internal error: output shape should be (%i, %i, 4) but "
+            "is %s" % (height, width, str(out.shape))
         )
     return out
 
 
-def images_are_near(baseline_image, result_image, max_outlier_fraction=0.005, pixel_error_threshold=0.04):
+def images_are_near(
+    baseline_image, result_image, max_outlier_fraction=0.005, pixel_error_threshold=0.04
+):
     """Compares two image arrays.
     The comparison is soft: the images are considered identical if fewer than
     max_outlier_fraction of the pixels differ by more than pixel_error_threshold
@@ -154,7 +166,9 @@ def images_are_near(baseline_image, result_image, max_outlier_fraction=0.005, pi
         outlier_pixels = jnp.any(outlier_channels, axis=2)
     else:
         outlier_pixels = outlier_channels
-    outlier_fraction = jnp.count_nonzero(outlier_pixels) / reduce(lambda x, y: x * y, baseline_image.shape[:2])
+    outlier_fraction = jnp.count_nonzero(outlier_pixels) / reduce(
+        lambda x, y: x * y, baseline_image.shape[:2]
+    )
     images_match = outlier_fraction <= max_outlier_fraction
     message = " (%f of pixels are outliers, maximum allowed is %f) " % (
         outlier_fraction,

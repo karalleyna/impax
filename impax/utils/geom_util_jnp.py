@@ -44,7 +44,10 @@ def batch_apply_4x4(arrs, ms, are_points=True):
     Returns:
       Numpy array with shape [bs, ..., 3].
     """
-    log("Input shapes to batch_apply_4x4: %s and %s" % (repr(arrs.shape), repr(ms.shape)))
+    log(
+        "Input shapes to batch_apply_4x4: %s and %s"
+        % (repr(arrs.shape), repr(ms.shape))
+    )
     bs = arrs.shape[0]
     assert ms.shape[0] == bs
     assert len(ms.shape) == 3
@@ -80,7 +83,10 @@ def transform_normals(normals, tx):
     transformed = batch_apply_4x4(normals, tx_invt)
     transformed[normals_invalid, :] = 0.0
     norm = jnp.linalg.norm(transformed, axis=-1, keepdims=True)
-    log.info("Norm shape, transformed shape: %s %s" % (repr(norm.shape), repr(transformed.shape)))
+    log.info(
+        "Norm shape, transformed shape: %s %s"
+        % (repr(norm.shape), repr(transformed.shape))
+    )
     transformed /= norm + 1e-8
     return jnp.reshape(transformed, [batch_size] + normal_shape + [3])
 
@@ -106,7 +112,9 @@ def transform_r2n2_normal_cam_image_to_world_frame(normal_im, idx, e):
     is_valid = jnp.all(normal_im == 0.0, axis=-1)
     log.info(is_valid.shape)
     is_valid = is_valid.reshape([224, 224])
-    world_im = apply_4x4(normal_im, jnp.linalg.inv(e.r2n2_cam2world[idx, ...]).T, are_points=False)
+    world_im = apply_4x4(
+        normal_im, jnp.linalg.inv(e.r2n2_cam2world[idx, ...]).T, are_points=False
+    )
     world_im /= jnp.linalg.norm(world_im, axis=-1, keepdims=True) + 1e-8
     # world_im = jnp_util.zero_by_mask(is_valid, world_im).astype(jnp.float32)
     return world_im
@@ -212,7 +220,9 @@ def select_top_k(argmax_im, xyzn_images):
             for ki in range(k):
                 idx = argmax_im_nonneg[i, j, ki]
                 if idx != -1:
-                    chosen[i, j, ki, :] = xyzn_images[argmax_im_nonneg[i, j, ki], i, j, :]
+                    chosen[i, j, ki, :] = xyzn_images[
+                        argmax_im_nonneg[i, j, ki], i, j, :
+                    ]
     # log.info(chosen.shape)
     # plot(chosen[..., 1, :3])
     return chosen
@@ -224,7 +234,9 @@ def make_r2n2_gt_top_k_image(e, idx, encoder, decoder, k=2):
     world_n = e.r2n2_normal_world_images.copy()[idx, ...]
     # world_xyzn = jnp.concatenate([world_xyz, world_n], axis=-1)
     embedding = encoder.run_example(e)
-    xyz_ims, nrm_ims = extract_local_frame_images(world_xyz, world_n, embedding, decoder)
+    xyz_ims, nrm_ims = extract_local_frame_images(
+        world_xyz, world_n, embedding, decoder
+    )
     argmax_im = compute_argmax_image(world_xyz, decoder, embedding, k=k)
 
     # log.info(xyz_ims.shape)
@@ -275,7 +287,9 @@ def depth_image_to_cam_image(depth_image, fx=585.0, fy=585.0, cx=255.5, cy=255.5
     is_invalid = jnp.squeeze(depth_image == 0.0)
     height, width = depth_image.shape[0:2]
     depth_image = jnp.reshape(depth_image, [height, width])
-    pixel_coords = jnp_util.make_coordinate_grid(height, width, is_screen_space=True, is_homogeneous=False)
+    pixel_coords = jnp_util.make_coordinate_grid(
+        height, width, is_screen_space=True, is_homogeneous=False
+    )
     # log.info(jnp.max(pixel_coords))
     # log.info(jnp.min(pixel_coords))
     nic_x = pixel_coords[:, :, 0]

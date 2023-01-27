@@ -36,19 +36,30 @@ class CBNLayer(nn.Module):
         batch_mean = jnp.mean(sample_embeddings, axis=(1, 2))
         batch_variance = jnp.var(sample_embeddings, axis=(1, 2))
 
-        assert batch_mean.shape == (batch_size,) and batch_variance.shape == (batch_size,)
+        assert batch_mean.shape == (batch_size,) and batch_variance.shape == (
+            batch_size,
+        )
         reduced_batch_mean = jnp.mean(batch_mean)
         reduced_batch_variance = jnp.mean(batch_variance)
 
-        running_mean = self.variable("stats", "running_mean_" + self.name + "rmean", init_fn=lambda: 0.0)
-        running_variance = self.variable("stats", "running_mean_" + self.name + "rvar", init_fn=lambda: 0.0)
+        running_mean = self.variable(
+            "stats", "running_mean_" + self.name + "rmean", init_fn=lambda: 0.0
+        )
+        running_variance = self.variable(
+            "stats", "running_mean_" + self.name + "rvar", init_fn=lambda: 0.0
+        )
 
         if self.is_training:
             running_mean.value = 0.995 * running_mean.value + 0.005 * reduced_batch_mean
-            running_variance.value = 0.995 * running_variance.value + 0.005 * reduced_batch_variance
+            running_variance.value = (
+                0.995 * running_variance.value + 0.005 * reduced_batch_variance
+            )
 
         denom = jnp.sqrt(running_variance.value + SQRT_EPS)
-        out = gamma[:, None, ...] * ((sample_embeddings - running_mean.value) / denom) + beta[:, None, ...]
+        out = (
+            gamma[:, None, ...] * ((sample_embeddings - running_mean.value) / denom)
+            + beta[:, None, ...]
+        )
 
         return out
 
@@ -75,21 +86,27 @@ class ResnetLayer(nn.Module):
     def __call__(self, shape_embedding, sample_embeddings):
         assert self.sample_embedding_length == sample_embeddings.shape[2]
         init_sample_embeddings = sample_embeddings
-        sample_embeddings = CBNLayer(self.sample_embedding_length, self.is_training, self.name + "_cbn")(
-            shape_embedding, sample_embeddings
-        )
+        sample_embeddings = CBNLayer(
+            self.sample_embedding_length, self.is_training, self.name + "_cbn"
+        )(shape_embedding, sample_embeddings)
 
         if self.fon == "t":
             init_sample_embeddings = sample_embeddings
 
         sample_embeddings = self.activation(sample_embeddings)
-        sample_embeddings = nn.Dense(features=self.sample_embedding_length)(sample_embeddings)
+        sample_embeddings = nn.Dense(features=self.sample_embedding_length)(
+            sample_embeddings
+        )
         sample_embeddings = CBNLayer(
-            sample_embedding_length=self.sample_embedding_length, is_training=self.is_training, name=self.name + "_cbn2"
+            sample_embedding_length=self.sample_embedding_length,
+            is_training=self.is_training,
+            name=self.name + "_cbn2",
         )(shape_embedding, sample_embeddings)
         sample_embeddings = self.activation(sample_embeddings)
         sample_embeddings = CBNLayer(
-            sample_embedding_length=self.sample_embedding_length, is_training=self.is_training, name=self.name + "_cbn3"
+            sample_embedding_length=self.sample_embedding_length,
+            is_training=self.is_training,
+            name=self.name + "_cbn3",
         )(shape_embedding, sample_embeddings)
         return init_sample_embeddings + sample_embeddings
 
@@ -138,7 +155,9 @@ class Decoder(nn.Module):
                 activation=self.activation,
             )(embedding, sample_embeddings)
         sample_embeddings = CBNLayer(
-            sample_embedding_length=self.sample_embedding_length, is_training=self.is_training, name=self.name + "_cb1"
+            sample_embedding_length=self.sample_embedding_length,
+            is_training=self.is_training,
+            name=self.name + "_cb1",
         )(embedding, sample_embeddings)
         vals = nn.Dense(1)(sample_embeddings)
         if self.apply_sigmoid:
@@ -181,7 +200,11 @@ class OCCNet(nn.Module):
                 repr(embedding.shape),
                 repr(samples.shape),
             )
-            assert embedding.shape[0] == 1 and samples.shape[0] == 1 and samples.shape[2] == 3
+            assert (
+                embedding.shape[0] == 1
+                and samples.shape[0] == 1
+                and samples.shape[2] == 3
+            )
 
             vals = Decoder(
                 self.sample_embedding_length,

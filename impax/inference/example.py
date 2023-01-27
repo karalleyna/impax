@@ -11,7 +11,14 @@ from scipy.ndimage import interpolation
 
 # local
 from impax.inference import util as inference_util
-from impax.utils import file_util, gaps_util, geom_util, geom_util_jnp, jnp_util, path_util
+from impax.utils import (
+    file_util,
+    gaps_util,
+    geom_util,
+    geom_util_jnp,
+    jnp_util,
+    path_util,
+)
 from impax.utils.file_util import log
 
 synset_to_cat = {
@@ -168,9 +175,7 @@ class InferenceExample(object):
 
         if dynamic:
             if verbose:
-                log.info(
-                    "Using dynamic files, not checking ahead for file existence."
-                )
+                log.info("Using dynamic files, not checking ahead for file existence.")
         elif not file_util.exists(self.npz_path):
             raise ValueError("Expected a .npz at %s." % self.npz_path)
         else:
@@ -696,7 +701,10 @@ class InferenceExample(object):
                 full_samples = jnp.tile(full_samples, [2, 1])
             self._precomputed_surface_samples_from_dodeca = full_samples[
                 jax.random.choice(
-                    self.get_key, jnp.arange(orig_count), shape=(self.surface_sample_count,), replace=False
+                    self.get_key,
+                    jnp.arange(orig_count),
+                    shape=(self.surface_sample_count,),
+                    replace=False,
                 ),
                 :,
             ]
@@ -714,7 +722,9 @@ class InferenceExample(object):
             world_xyzn = jnp.concatenate([world_xyz, world_n], axis=-1)
             world_xyzn = world_xyzn[is_valid, :]
             world_xyzn = jnp.reshape(world_xyzn, [-1, 6])
-            world_xyzn = jax.random.permutation(self.get_key, world_xyzn, independent=True)
+            world_xyzn = jax.random.permutation(
+                self.get_key, world_xyzn, independent=True
+            )
             assert world_xyzn.shape[0] > 1
             while world_xyzn.shape[0] < self.surface_sample_count:
                 log.info(

@@ -242,7 +242,8 @@ def sample_loss(
         local_decisions, local_weights = local_outputs
         predicted_class = local_decisions
         gt_class = jnp.tile(
-            jnp.expand_dims(gt_class, axis=1), [1, model_config.num_shape_elements, 1, 1]
+            jnp.expand_dims(gt_class, axis=1),
+            [1, model_config.num_shape_elements, 1, 1],
         )
         weights = local_weights
     elif model_config.loss_receptive_field == "g":
@@ -273,7 +274,11 @@ def sample_loss(
 
 def uniform_sample_loss(model_config, training_example, structured_implicit):
     """Loss that uniformly sampled points should have the right insidedness."""
-    sample_count = model_config.num_subsampled_points if model_config.loss_receptive_field == "x" else model_config.num_sample_points
+    sample_count = (
+        model_config.num_subsampled_points
+        if model_config.loss_receptive_field == "x"
+        else model_config.num_sample_points
+    )
     samples, gt_sdf = training_example.sample_sdf_uniform(sample_count=sample_count)
     logging_util.log.info("Building Uniform Sample Loss.")
     logging_util.log.info("Uni. Samples shape: %s", str(samples.shape))
@@ -290,17 +295,28 @@ def uniform_sample_loss(model_config, training_example, structured_implicit):
 
 def overlap_loss(model_config, training_example, structured_implicit):
     """A loss on the overlap between RBF weights."""
-    sample_count = model_config.num_subsampled_points if model_config.loss_receptive_field == "x" else model_config.num_sample_points
+    sample_count = (
+        model_config.num_subsampled_points
+        if model_config.loss_receptive_field == "x"
+        else model_config.num_sample_points
+    )
     samples, _ = training_example.sample_sdf_near_surface(sample_count=sample_count)
     rbf_influences = structured_implicit.rbf_influence_at_samples(samples)
     assert len(rbf_influences.shape) == 3  # [b, sample_count, eec]
-    loss = jnp.mean(jnp.linalg.norm(rbf_influences, ord=1, axis=2)) * model_config.overlap_loss_weight
+    loss = (
+        jnp.mean(jnp.linalg.norm(rbf_influences, ord=1, axis=2))
+        * model_config.overlap_loss_weight
+    )
     return loss
 
 
 def near_surface_sample_loss(model_config, training_example, structured_implicit):
     """An inside/outside loss that samples based on distance to the surface."""
-    sample_count = model_config.num_subsampled_points if model_config.loss_receptive_field == "x" else model_config.num_sample_points
+    sample_count = (
+        model_config.num_subsampled_points
+        if model_config.loss_receptive_field == "x"
+        else model_config.num_sample_points
+    )
     samples, gt_sdf = training_example.sample_sdf_near_surface(
         sample_count=sample_count
     )
@@ -322,7 +338,6 @@ def compute_loss(model_config, training_example, structured_implicit):
         "u": uniform_sample_loss,
         "ns": near_surface_sample_loss,
         "ec": shape_element_center_loss,
-        "oc": old_shape_element_center_loss,
         "m": shape_element_center_magnitude_loss,
         "gd": element_center_lowres_grid_direct_loss,
         "gs": element_center_lowres_grid_squared_loss,

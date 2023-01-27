@@ -29,7 +29,9 @@ class TwinInference(nn.Module):
         assert self.element_embedding_length > 10
         # "Unsafe code: May not be possible to determine. Presence/absence of implicit parameters."
 
-        prediction, embedding = self.inference_fn(observation, explicit_embedding_length)
+        prediction, embedding = self.inference_fn(
+            observation, explicit_embedding_length
+        )
 
         if remaining_length > 0:
             implicit_parameters, implicit_embedding = self.inference_fn(
@@ -126,7 +128,9 @@ class Decoder(nn.Module):
             x = nn.BatchNorm(self.use_running_average)(x)
             x = self.activation(x)
 
-        x = nn.Dense(spatial_shapes[-1][1] * spatial_shapes[-1][2] * spatial_shapes[-1][3])(x)
+        x = nn.Dense(
+            spatial_shapes[-1][1] * spatial_shapes[-1][2] * spatial_shapes[-1][3]
+        )(x)
         x = nn.BatchNorm(self.use_running_average)(x)
         x = self.activation(x)
 

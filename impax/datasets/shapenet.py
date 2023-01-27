@@ -27,22 +27,37 @@ it should be here.
 
 
 def ensure_shape_and_resize_if_needed(
-    orig_renders, batch_size, frame_count, channel_count, orig_height, orig_width, target_height, target_width
+    orig_renders,
+    batch_size,
+    frame_count,
+    channel_count,
+    orig_height,
+    orig_width,
+    target_height,
+    target_width,
 ):
     """Checks that the input tensor has an expected size, resizing if needed."""
 
     if target_height != orig_height or target_width != orig_width:
-        renders = jnp.reshape(orig_renders.numpy(), [batch_size * frame_count, orig_height, orig_width, channel_count])
+        renders = jnp.reshape(
+            orig_renders.numpy(),
+            [batch_size * frame_count, orig_height, orig_width, channel_count],
+        )
         renders = jax.image.resize(
             renders,
             (batch_size * frame_count, target_height, target_width, channel_count),
             method="nearest",
             antialias=True,
         )
-        renders = jnp.reshape(renders, [batch_size, frame_count, target_height, target_width, channel_count])
+        renders = jnp.reshape(
+            renders,
+            [batch_size, frame_count, target_height, target_width, channel_count],
+        )
     else:
         renders = orig_renders
-    renders = jnp.reshape(renders, [batch_size, frame_count, target_height, target_width, channel_count])
+    renders = jnp.reshape(
+        renders, [batch_size, frame_count, target_height, target_width, channel_count]
+    )
     return renders
 
 
@@ -58,7 +73,9 @@ def select_image(images, indices):
     """
     batch_size, _, height, width, channel_count = images.shape
     image_count = indices.shape[1]
-    selected = jax.vmap(lambda x, y: jnp.take(x, y, axis=0), in_axes=(0, 0))(images, indices)
+    selected = jax.vmap(lambda x, y: jnp.take(x, y, axis=0), in_axes=(0, 0))(
+        images, indices
+    )
     assert selected.shape == (batch_size, image_count, height, width, channel_count)
 
     return selected
@@ -115,27 +132,49 @@ ShapeNetSparseProvider = collections.namedtuple(
 )
 
 
-def build_placeholder_interface(model_config, proto="ShapeNetNSSDodecaSparseLRGMediumSlimPC"):
+def build_placeholder_interface(
+    model_config, proto="ShapeNetNSSDodecaSparseLRGMediumSlimPC"
+):
     """Return a placeholder clone of the interface the tf.Dataset() interface."""
     # TODO(kgenova) Add hyperparameters for RGB resolution. The 3D-R2N2 renders
     # are currently used for eval, and their resolution is baked in.
     mesh_renders = tf.placeholder(tf.float32, [model_config.batch_size, 6, 137, 137, 4])
     depth_renders = tf.placeholder(
-        tf.float32, [model_config.batch_size, 20, model_config.gap_height, model_config.gap_width, 1]
+        tf.float32,
+        [
+            model_config.batch_size,
+            20,
+            model_config.gap_height,
+            model_config.gap_width,
+            1,
+        ],
     )
     depth_render = tf.placeholder(
-        tf.float32, [model_config.batch_size, model_config.gap_height, model_config.gap_width, 1]
+        tf.float32,
+        [model_config.batch_size, model_config.gap_height, model_config.gap_width, 1],
     )
     xyz_render = tf.placeholder(
-        tf.float32, [model_config.batch_size, model_config.gap_height, model_config.gap_width, 3]
+        tf.float32,
+        [model_config.batch_size, model_config.gap_height, model_config.gap_width, 3],
     )
     lum_renders = tf.placeholder(
-        tf.float32, [model_config.batch_size, 20, model_config.gap_height, model_config.gap_width, 1]
+        tf.float32,
+        [
+            model_config.batch_size,
+            20,
+            model_config.gap_height,
+            model_config.gap_width,
+            1,
+        ],
     )
     # TODO(kgenova) The surface points have variable shape...
     surface_point_samples = tf.placeholder(tf.float32)
-    bounding_box_samples = tf.placeholder(tf.float32, [model_config.batch_size, 100000, 4])
-    near_surface_samples = tf.placeholder(tf.float32, [model_config.batch_size, 100000, 4])
+    bounding_box_samples = tf.placeholder(
+        tf.float32, [model_config.batch_size, 100000, 4]
+    )
+    near_surface_samples = tf.placeholder(
+        tf.float32, [model_config.batch_size, 100000, 4]
+    )
     mesh_name = tf.placeholder(tf.string)
     world2grid = tf.placeholder(tf.float32, [model_config.batch_size, 4, 4])
     grid = tf.placeholder(tf.float32)  # [model_config.batch_size, 32, 32, 32])
@@ -228,7 +267,8 @@ class ShapeNetExample(object):
     def full_near_surface_samples(self):
         if not hasattr(self, "_full_near_surface_samples"):
             self._full_near_surface_samples = tf.ensure_shape(
-                self._dataset.near_surface_samples, [self._model_config.batch_size, 100000, 4]
+                self._dataset.near_surface_samples,
+                [self._model_config.batch_size, 100000, 4],
             )
         return self._full_near_surface_samples
 
@@ -236,7 +276,8 @@ class ShapeNetExample(object):
     def full_uniform_samples(self):
         if not hasattr(self, "_full_uniform_samples"):
             self._full_uniform_samples = tf.ensure_shape(
-                self._dataset.bounding_box_samples, [self._model_config.batch_size, 100000, 4]
+                self._dataset.bounding_box_samples,
+                [self._model_config.batch_size, 100000, 4],
             )
         return self._full_uniform_samples
 
@@ -246,7 +287,10 @@ class ShapeNetExample(object):
         max_sample = samples.get_shape().as_list()[1]
         # assert max_sample == 100000
         sample_indices = tf.random.uniform(
-            [self._model_config.batch_size, sample_count], minval=0, maxval=max_sample - 1, dtype=tf.int32
+            [self._model_config.batch_size, sample_count],
+            minval=0,
+            maxval=max_sample - 1,
+            dtype=tf.int32,
         )
         subsamples = tf.batch_gather(samples, sample_indices)
         return self._finite_wrapper(subsamples)
@@ -270,14 +314,21 @@ class ShapeNetExample(object):
                 self._model_config.input_width,
             )
             depth_render = tf.cast(depth_render, dtype=tf.float32)
-            depth_render = apply_noise_to_depth(depth_render, self._model_config.depth_map_noise)
+            depth_render = apply_noise_to_depth(
+                depth_render, self._model_config.depth_map_noise
+            )
             self._depth_render = depth_render / 1000.0
         return self._depth_render
 
     def apply_transformation(self, tx):
         """Applies a transformation to a shape."""
         shape = tx.get_shape().as_list()
-        if len(shape) != 3 or shape[0] != self._model_config.batch_size or shape[1] != 4 or shape[2] != 4:
+        if (
+            len(shape) != 3
+            or shape[0] != self._model_config.batch_size
+            or shape[1] != 4
+            or shape[2] != 4
+        ):
             raise ValueError(f"Unexpected shape for example transformation: {shape}")
         # TODO(kgenova) We assert no access has happened because it is safest.
         # This way it is guaranteed the untransformed points are never accessed.
@@ -289,7 +340,10 @@ class ShapeNetExample(object):
         # the whole point cloud to the local frame.
         all_surface_points = self.all_surface_points
         all_surface_normals = self.all_normals
-        all_surface_points, all_surface_normals = geom_util.transform_points_with_normals(
+        (
+            all_surface_points,
+            all_surface_normals,
+        ) = geom_util.transform_points_with_normals(
             all_surface_points, tx=tx, normals=all_surface_normals
         )
         self._all_surface_points = all_surface_points
@@ -298,15 +352,22 @@ class ShapeNetExample(object):
         # TODO(kgenova) If we need the SDF itself that could get problematic because
         # it transforms as well if there's a scale in tx. Shouldn't matter though.
         if self._model_config.train or self._model_config.eval:
-            self._full_near_surface_samples = geom_util.transform_featured_points(self.full_near_surface_samples, tx)
-            self._full_uniform_samples = geom_util.transform_featured_points(self.full_uniform_samples, tx)
+            self._full_near_surface_samples = geom_util.transform_featured_points(
+                self.full_near_surface_samples, tx
+            )
+            self._full_uniform_samples = geom_util.transform_featured_points(
+                self.full_uniform_samples, tx
+            )
             world2local = tx
             local2world = tf.linalg.inv(world2local)
             local2grid = tf.matmul(self.world2grid, local2world)
             self._world2grid = local2grid
 
     def crop_input(self, crop_count=1024):
-        self._all_surface_points, self._all_surface_normals = geom_util.extract_points_near_origin(
+        (
+            self._all_surface_points,
+            self._all_surface_normals,
+        ) = geom_util.extract_points_near_origin(
             self._all_surface_points, crop_count, features=self._all_surface_normals
         )
 
@@ -314,7 +375,9 @@ class ShapeNetExample(object):
         self._full_near_surface_samples = geom_util.extract_points_near_origin(
             self._full_near_surface_samples, 2 * crop_count
         )
-        self._full_uniform_samples = geom_util.extract_points_near_origin(self._full_uniform_samples, crop_count)
+        self._full_uniform_samples = geom_util.extract_points_near_origin(
+            self._full_uniform_samples, crop_count
+        )
 
     @property
     def xyz_render(self):
@@ -331,7 +394,9 @@ class ShapeNetExample(object):
                 self._model_config.input_width,
             )
             xyz_render = tf.cast(xyz_render, dtype=tf.float32)
-            self._xyz_render = add_noise_to_xyz(xyz_render, self._model_config.xyz_noise)
+            self._xyz_render = add_noise_to_xyz(
+                xyz_render, self._model_config.xyz_noise
+            )
         return self._xyz_render
 
     @property
@@ -349,7 +414,9 @@ class ShapeNetExample(object):
                 self._model_config.input_width,
             )
             depth_renders = tf.cast(depth_renders, dtype=tf.float32)
-            depth_renders = apply_noise_to_depth(depth_renders, self._model_config.depth_map_noise)
+            depth_renders = apply_noise_to_depth(
+                depth_renders, self._model_config.depth_map_noise
+            )
             self._depth_renders = depth_renders / 1000.0  # Was in 1000-ths.
         return self._finite_wrapper(self._depth_renders)
 
@@ -357,7 +424,10 @@ class ShapeNetExample(object):
     def random_depth_indices(self):
         if self._random_depth_indices is None:
             self._random_depth_indices = tf.random_uniform(
-                shape=[self._model_config.batch_size, self._model_config.num_random_images],
+                shape=[
+                    self._model_config.batch_size,
+                    self._model_config.num_random_images,
+                ],
                 minval=0,
                 maxval=19,
                 dtype=tf.int32,
@@ -368,7 +438,9 @@ class ShapeNetExample(object):
     @property
     def random_depth_images(self):
         if self._random_depth_images is None:
-            self._random_depth_images = select_image(self.depth_renders, self.random_depth_indices)
+            self._random_depth_images = select_image(
+                self.depth_renders, self.random_depth_indices
+            )
         return self._finite_wrapper(self._random_depth_images)
 
     @property
@@ -378,12 +450,21 @@ class ShapeNetExample(object):
             self._random_depth_to_worlds = tf.gather(
                 self.depth_to_world,
                 tf.reshape(
-                    self.random_depth_indices, [self._model_config.batch_size * self._model_config.num_random_images]
+                    self.random_depth_indices,
+                    [
+                        self._model_config.batch_size
+                        * self._model_config.num_random_images
+                    ],
                 ),
             )
             self._random_depth_to_worlds = tf.reshape(
                 self._random_depth_to_worlds,
-                [self._model_config.batch_size, self._model_config.num_random_images, 4, 4],
+                [
+                    self._model_config.batch_size,
+                    self._model_config.num_random_images,
+                    4,
+                    4,
+                ],
             )
         return self._finite_wrapper(self._random_depth_to_worlds)
 
@@ -391,14 +472,17 @@ class ShapeNetExample(object):
     def xyz_renders(self):
         if not hasattr(self, "_xyz_renders"):
             self._xyz_renders = add_noise_to_xyz(
-                geom_util.transform_depth_dodeca_to_xyz_dodeca(self.depth_renders), self._model_config.xyz_noise
+                geom_util.transform_depth_dodeca_to_xyz_dodeca(self.depth_renders),
+                self._model_config.xyz_noise,
             )
         return self._xyz_renders
 
     @property
     def depth_to_world(self):
         if self._depth_to_world is None:
-            self._depth_to_world = tf.constant(geom_util.get_dodeca_camera_to_worlds(), dtype=tf.float32)
+            self._depth_to_world = tf.constant(
+                geom_util.get_dodeca_camera_to_worlds(), dtype=tf.float32
+            )
             self._depth_to_world = tf.ensure_shape(self._depth_to_world, [20, 4, 4])
         return self._finite_wrapper(self._depth_to_world)
 
@@ -449,7 +533,13 @@ class ShapeNetExample(object):
             chosen = self._subsample(self.renders, sample_count=1)
             chosen_rgba = tf.reshape(
                 chosen,
-                [self._model_config.batch_size, 1, self._model_config.input_height, self._model_config.input_width, 4],
+                [
+                    self._model_config.batch_size,
+                    1,
+                    self._model_config.input_height,
+                    self._model_config.input_width,
+                    4,
+                ],
             )
             chosen_rgb = image_util.rgba_to_rgb(self._model_config, chosen_rgba)
             self._chosen_renders = chosen_rgb
@@ -462,7 +552,13 @@ class ShapeNetExample(object):
             self._random_lum_render = self._subsample(self.lum_renders, sample_count=1)
             self._random_lum_render = tf.reshape(
                 self._random_lum_render,
-                [self._model_config.batch_size, 1, self._model_config.input_height, self._model_config.input_width, 1],
+                [
+                    self._model_config.batch_size,
+                    1,
+                    self._model_config.input_height,
+                    self._model_config.input_width,
+                    1,
+                ],
             )
         return self._random_lum_render
 
@@ -473,7 +569,13 @@ class ShapeNetExample(object):
             self._random_xyz_render = self._subsample(self.xyz_renders, sample_count=1)
             self._random_xyz_render = tf.reshape(
                 self._random_xyz_render,
-                [self._model_config.batch_size, 1, self._model_config.input_height, self._model_config.input_width, 3],
+                [
+                    self._model_config.batch_size,
+                    1,
+                    self._model_config.input_height,
+                    self._model_config.input_width,
+                    3,
+                ],
             )
             return self._random_xyz_render
 
@@ -514,8 +616,12 @@ class ShapeNetExample(object):
         return self._finite_wrapper(tf.split(self.full_uniform_samples, [3, 1], axis=2))
 
     def _set_points_and_normals(self):
-        points, normals = tf.split(self._full_zero_set_points_and_normals, [3, 3], axis=2)
-        points = add_noise_in_normal_direction(points, normals, self._model_config.point_cloud_noise)
+        points, normals = tf.split(
+            self._full_zero_set_points_and_normals, [3, 3], axis=2
+        )
+        points = add_noise_in_normal_direction(
+            points, normals, self._model_config.point_cloud_noise
+        )
         self._all_surface_points = points
         self._all_surface_normals = normals
 
@@ -533,7 +639,11 @@ class ShapeNetExample(object):
 
     def sample_zero_set_points_and_normals(self, sample_count):
         if self._full_zero_set_points_and_normals is None:
-            raise ValueError("Trying to sample from surface points but they are not in the proto.")
-        subsamples = self._subsample(self._full_zero_set_points_and_normals, sample_count)
+            raise ValueError(
+                "Trying to sample from surface points but they are not in the proto."
+            )
+        subsamples = self._subsample(
+            self._full_zero_set_points_and_normals, sample_count
+        )
         points, normals = tf.split(subsamples, [3, 3], axis=2)
         return self._finite_wrapper(points), self._finite_wrapper(normals)

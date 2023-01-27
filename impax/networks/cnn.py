@@ -5,6 +5,7 @@ import jax.numpy as jnp
 from flax import linen as nn
 
 from impax.networks.resnet_v2 import ResNet
+
 # local
 from impax.utils.logging_util import log
 from impax.utils.model_utils import Encoder
@@ -21,7 +22,7 @@ class EarlyFusionCNN(nn.Module):
     @nn.compact
     def __call__(self, observation, element_length: int) -> Any:
         x = observation.tensor
-        
+
         batch_size, num_images, height, width, num_channels = x.shape
         log.warning(f"Input shape to early-fusion cnn: {x.shape}")
 
@@ -42,9 +43,7 @@ class EarlyFusionCNN(nn.Module):
                 use_running_average=self.use_running_average,
             )(x)
         elif self.architecture in ["r18", "r50", "h50", "k50", "s50"]:
-            embedding = ResNet(
-                [64, 128, 256, 512], return_intermediates=False
-            )(x)
+            embedding = ResNet([64, 128, 256, 512], return_intermediates=False)(x)
             embedding = jnp.reshape(embedding, [batch_size, -1])
 
         prediction = embedding

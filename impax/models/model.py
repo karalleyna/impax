@@ -13,6 +13,7 @@ from impax.configs.sif import get_config
 from impax.datasets.preprocess import preprocess
 from impax.models.observation import Observation
 from impax.models.prediction import Prediction
+
 # local
 from impax.networks.cnn import EarlyFusionCNN, MidFusionCNN
 from impax.networks.occnet import Decoder
@@ -51,10 +52,14 @@ class PointNetSIFPredictor(nn.Module):
     max_encodable: int = 1024
 
     @nn.compact
-    def __call__(self, observation, element_length: int, key: random.PRNGKey = random.PRNGKey(0)):
+    def __call__(
+        self, observation, element_length: int, key: random.PRNGKey = random.PRNGKey(0)
+    ):
 
         """A cnn that maps 1+ images with 1+ chanels to a feature vector."""
-        inputs = jnp.concatenate([observation.surface_points, observation.normals], axis=-1)
+        inputs = jnp.concatenate(
+            [observation.surface_points, observation.normals], axis=-1
+        )
         batch_size, sample_count = inputs.shape[:2]
         if sample_count > self.max_encodable:
             sample_indices = random.randint(
@@ -65,9 +70,13 @@ class PointNetSIFPredictor(nn.Module):
                 dtype=jnp.int32,
             )
             inputs = vmap(lambda x, y: x[y], in_axes=(0, 0))(inputs, sample_indices)
-        embedding = PointEncoder(self.element_count * element_length, self.model_config)(inputs)
+        embedding = PointEncoder(
+            self.element_count * element_length, self.model_config
+        )(inputs)
         batch_size = inputs.shape[0]
-        prediction = jnp.reshape(embedding, [batch_size, self.element_count, element_length])
+        prediction = jnp.reshape(
+            embedding, [batch_size, self.element_count, element_length]
+        )
         return prediction, embedding
 
 
@@ -84,7 +93,11 @@ class StructuredImplicitModel(nn.Module):
             resnet_layer_count = self.model_config.num_resnet_layers
             fon = "t" if self.model_config.fix_occnet else "f"
             self.single_element_implicit_eval_fun = Decoder(
-                sample_embedding_length, resnet_layer_count, True, fon, self.model_config.train
+                sample_embedding_length,
+                resnet_layer_count,
+                True,
+                fon,
+                self.model_config.train,
             )
         else:
             self.single_element_implicit_eval_fun = None
@@ -92,13 +105,18 @@ class StructuredImplicitModel(nn.Module):
     def _global_local_forward(self, observation, inference_model):
         """A forward pass that include both template and element inference."""
 
-        explicit_element_length = structured_implicit_functions.element_explicit_dof(self.model_config)
-        implicit_embedding_length = structured_implicit_functions.element_implicit_dof(self.model_config)
+        explicit_element_length = structured_implicit_functions.element_explicit_dof(
+            self.model_config
+        )
+        implicit_embedding_length = structured_implicit_functions.element_implicit_dof(
+            self.model_config
+        )
 
         if explicit_element_length <= 0:
             raise ValueError(
                 "Invalid element length. Embedding has length "
-                "%i, but total length is only %i." % (implicit_embedding_length, explicit_element_length)
+                "%i, but total length is only %i."
+                % (implicit_embedding_length, explicit_element_length)
             )
 
         batch_size = self.model_config.batch_size
@@ -169,7 +187,9 @@ class StructuredImplicitModel(nn.Module):
     @nn.compact
     def __call__(self, observation, key):
         """Evaluates the explicit and implicit parameter vectors as a Prediction."""
-        flat_element_length = structured_implicit_functions.element_explicit_dof(self.model_config)
+        flat_element_length = structured_implicit_functions.element_explicit_dof(
+            self.model_config
+        )
         num_elements = self.model_config.num_shape_elements
 
         if self.model_config.model_architecture == "efcnn":
@@ -178,13 +198,20 @@ class StructuredImplicitModel(nn.Module):
             inference_model = MidFusionCNN(
                 num_elements,
                 self.model_config.batch_size,
-                jnp.repeat(geom_util.get_dodeca_camera_to_worlds()[None, ...], self.model_config.batch_size, axis=0),
+                jnp.repeat(
+                    geom_util.get_dodeca_camera_to_worlds()[None, ...],
+                    self.model_config.batch_size,
+                    axis=0,
+                ),
             )
         elif self.model_config.model_architecture == "pn":
-            inference_model = partial(PointNetSIFPredictor(num_elements, self.model_config), key=key)
+            inference_model = partial(
+                PointNetSIFPredictor(num_elements, self.model_config), key=key
+            )
         else:
             raise ValueError(
-                "Invalid StructuredImplicitModel architecture hparam: %s" % self.model_config.model_architecture
+                "Invalid StructuredImplicitModel architecture hparam: %s"
+                % self.model_config.model_architecture
             )
 
         element_embedding_length = self.model_config.implicit_parameter_length
@@ -193,7 +220,9 @@ class StructuredImplicitModel(nn.Module):
             return self._global_local_forward(observation, inference_model)
 
         if implicit_architecture == "1":
-            structured_implicit_activations, embedding = inference_model(observation.tensor)
+            structured_implicit_activations, embedding = inference_model(
+                observation.tensor
+            )
         elif implicit_architecture == "2":
             (structured_implicit_activations, embedding,) = TwinInference(
                 inference_model,
@@ -204,10 +233,14 @@ class StructuredImplicitModel(nn.Module):
         else:
             raise ValueError(f"Invalid value for {implicit_architecture}")
 
-        structured_implicit = structured_implicit_functions.StructuredImplicit.from_activation(
-            structured_implicit_activations, self, self.model_config
+        structured_implicit = (
+            structured_implicit_functions.StructuredImplicit.from_activation(
+                structured_implicit_activations, self, self.model_config
+            )
         )
-        return Prediction(self.model_config, observation, structured_implicit, embedding)
+        return Prediction(
+            self.model_config, observation, structured_implicit, embedding
+        )
 
     def eval_implicit_parameters(self, implicit_parameters, samples):
         """Decodes each implicit parameter vector at each of its sample points.
@@ -245,7 +278,9 @@ class StructuredImplicitModel(nn.Module):
                 implicit_parameters,
                 [batch_size * element_count, element_embedding_length],
             )
-            batched_samples = jnp.reshape(samples, [batch_size * element_count, sample_count, 3])
+            batched_samples = jnp.reshape(
+                samples, [batch_size * element_count, sample_count, 3]
+            )
             if self.model_config.seperate_network:
                 raise ValueError(
                     "Incompatible hparams. Must use _deprecated_multielement_eval"
@@ -258,13 +293,17 @@ class StructuredImplicitModel(nn.Module):
                 apply_sigmoid=False,
                 model_config=self.model_config,
             )
-            vals = jnp.reshape(batched_vals, [batch_size, element_count, sample_count, 1])
+            vals = jnp.reshape(
+                batched_vals, [batch_size, element_count, sample_count, 1]
+            )
         self._eval_implicit_parameters_call_count += 1
         return vals
 
     def _deprecated_multielement_eval(self, implicit_parameters, samples):
         """An eval provided for backwards compatibility."""
-        evals = vmap(self.single_element_implicit_eval_fun, in_axes=(1, 1, None, None))(implicit_parameters, samples)
+        evals = vmap(self.single_element_implicit_eval_fun, in_axes=(1, 1, None, None))(
+            implicit_parameters, samples
+        )
         return evals
 
 
@@ -275,7 +314,9 @@ if __name__ == "__main__":
 
     cfg = get_config()
 
-    dataset = _make_optimized_dataset("/Users/burak/Desktop/repos/impax/impax/data2", cfg.batch_size, "train", "data2")
+    dataset = _make_optimized_dataset(
+        "/Users/burak/Desktop/repos/impax/impax/data2", cfg.batch_size, "train", "data2"
+    )
 
     for data in dataset:
         data = preprocess(cfg, data, "train")

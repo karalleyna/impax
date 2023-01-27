@@ -8,6 +8,7 @@ https://github.com/google/ldif/blob/master/ldif/util/geom_util_jnp.py
 import math
 
 import jax.numpy as jnp
+
 # global
 import numpy as np
 import pytest
@@ -15,6 +16,7 @@ import tensorflow as tf
 from jax import random
 
 from impax.utils import geom_util_jnp
+
 # ldif is an internal package, should be imported last.
 # pylint: disable=g-bad-import-order
 from ldif.ldif.util import geom_util_np

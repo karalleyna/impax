@@ -144,5 +144,13 @@ def parse_example(filename):
     return tf.py_func(
         _example_dict_tf_func_wrapper,
         [filename],
-        [tf.float32, tf.float32, tf.string, tf.float32, tf.float32, tf.float32, tf.float32],
+        [
+            tf.float32,
+            tf.float32,
+            tf.string,
+            tf.float32,
+            tf.float32,
+            tf.float32,
+            tf.float32,
+        ],
     )

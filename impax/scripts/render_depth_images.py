@@ -63,10 +63,20 @@ def get_cam2world(center, eye, world_up):
 
 
 def find_critical_radius(
-    mesh, dir_to_eye, center, world_up, context, min_radius=0.3, max_radius=3.0, iterations=10, fallback_radius=1.5
+    mesh,
+    dir_to_eye,
+    center,
+    world_up,
+    context,
+    min_radius=0.3,
+    max_radius=3.0,
+    iterations=10,
+    fallback_radius=1.5,
 ):
     def radius_clips(radius):
-        cam2world = get_cam2world(eye=dir_to_eye * radius, center=center, world_up=world_up)
+        cam2world = get_cam2world(
+            eye=dir_to_eye * radius, center=center, world_up=world_up
+        )
         depth = render_depth_image(mesh, cam2world, context)
         return clips_edge(depth)
 
@@ -115,7 +125,9 @@ def get_projection_matrix():
 
 
 def main(_):
-    context = pyrender.OffscreenRenderer(viewport_width=FLAGS.width, viewport_height=FLAGS.height, point_size=1.0)
+    context = pyrender.OffscreenRenderer(
+        viewport_width=FLAGS.width, viewport_height=FLAGS.height, point_size=1.0
+    )
     mesh = trimesh.load(FLAGS.input_mesh)
     n_images_per_mesh = 16
     images, cam2world = sample_depth_images(mesh, context, n_images_per_mesh)
@@ -125,7 +137,11 @@ def main(_):
     # save them that way.
     np.savez_compressed(
         FLAGS.output_npz,
-        {"depth": np.array(images), "cam2world": np.array(cam2world), "projection": np.array(projection_matrix)},
+        {
+            "depth": np.array(images),
+            "cam2world": np.array(cam2world),
+            "projection": np.array(projection_matrix),
+        },
     )
     # If you want to visualize:
     # for i in range(n_images_per_mesh):

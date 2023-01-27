@@ -16,13 +16,15 @@ for file in shapenet_dir.glob("*/*/*/model_normalized.obj"):
     class_name = file.parent.parent.parent.name
     file_id = file.parent.parent.name
     filename = file.name
-    
+
     print(class_name, file_id)
-    split = str(df[(df.synsetId == int(class_name)) & (df.modelId == file_id)].split.values[0])
-    out_dir = mesh_directory / split / class_name 
-    
+    split = str(
+        df[(df.synsetId == int(class_name)) & (df.modelId == file_id)].split.values[0]
+    )
+    out_dir = mesh_directory / split / class_name
+
     out_dir.mkdir(exist_ok=True, parents=True)
-    
+
     copy(str(file), str(out_dir / (file_id + ".obj")))
     if counter == 0:
         break

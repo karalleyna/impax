@@ -16,7 +16,9 @@ def test_rgba_to_rgb(seed, white_background, smooth):
     key = random.PRNGKey(seed)
     rgba = jax.random.normal(key, (32, 32, 32, 4))
 
-    cfg = {"hparams": {"bg": ("w" if white_background else "b") + ("s" if smooth else "")}}
+    cfg = {
+        "hparams": {"bg": ("w" if white_background else "b") + ("s" if smooth else "")}
+    }
 
     model_config = ConfigDict(cfg)
 
@@ -84,8 +86,16 @@ def test_images_are_near(seed):
     baseline_image = jax.random.normal(key, (32, 32, 3))
     result_image = jax.random.normal(key, (32, 32, 3))
 
-    gnd, m1 = orig.images_are_near(baseline_image, result_image, max_outlier_fraction=0.005, pixel_error_threshold=0.04)
+    gnd, m1 = orig.images_are_near(
+        baseline_image,
+        result_image,
+        max_outlier_fraction=0.005,
+        pixel_error_threshold=0.04,
+    )
     ret, m2 = image_util.images_are_near(
-        baseline_image, result_image, max_outlier_fraction=0.005, pixel_error_threshold=0.04
+        baseline_image,
+        result_image,
+        max_outlier_fraction=0.005,
+        pixel_error_threshold=0.04,
     )
     assert jnp.allclose(gnd, ret)

@@ -67,9 +67,7 @@ def increase_frequency(x, out_dim, flatten=False, interleave=True):
     if interleave:
 
         output = vmap(
-            lambda s, c: jnp.stack([s, c], axis=-1),
-            in_axes=(-1, -1),
-            out_axes=-2
+            lambda s, c: jnp.stack([s, c], axis=-1), in_axes=(-1, -1), out_axes=-2
         )(sin_scaled, cos_scaled)
         output = jnp.reshape(output, output.shape[:-2] + (-1,))
 
