@@ -8,9 +8,7 @@ import jax
 import jax.numpy as jnp
 
 
-def apply_class_transfer(
-    sdf, model_config, soft_transfer, offset, dtype=None
-):
+def apply_class_transfer(sdf, model_config, soft_transfer, offset, dtype=None):
     """Applies a class label transformation to an input sdf.
     Args:
       sdf: Tensor of any shape. The sdfs to transform elementwise.
@@ -32,7 +30,7 @@ def apply_class_transfer(
         sdf -= offset
     if soft_transfer:
         # todo: this should enable trainable hardness but not possible
-        if model_config.hparams.lhdn == 't':
+        if model_config.hparams.lhdn == "t":
             hardness = model_config.hparams.hdn
         else:
             hardness = model_config.hparams.hdn

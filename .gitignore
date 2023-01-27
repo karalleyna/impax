@@ -9,7 +9,9 @@ impax/data/test
 impax/data/train
 impax/data/val
 impax/gaps
+impax/data2
 ldif/
+
 *.obj
 *.ply
 # Distribution / packaging
