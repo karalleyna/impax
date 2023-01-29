@@ -11,6 +11,7 @@ impax/data/val
 impax/gaps
 impax/data2
 ldif/
+output/
 
 *.obj
 *.ply

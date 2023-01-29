@@ -12,12 +12,7 @@ import tempfile
 import jax.numpy as jnp
 import numpy as np
 
-
-from impax.utils import file_util
-from impax.utils import geom_util_jnp
-from impax.utils import jnp_util
-from impax.utils import py_util
-from impax.utils import path_util
+from impax.utils import file_util, geom_util_jnp, jnp_util, path_util, py_util
 from impax.utils.file_util import log
 
 
@@ -152,10 +147,10 @@ def read_pts_file(path):
     """Reads a .pts or a .sdf point samples file."""
     _, ext = os.path.splitext(path)
     assert ext in [".sdf", ".pts"]
-    l = 4 if ext == ".sdf" else 6
+    line = 4 if ext == ".sdf" else 6
     with file_util.open_file(path, "rb") as f:
         points = np.fromfile(f, dtype=jnp.float32)
-    points = jnp.reshape(points, [-1, l])
+    points = jnp.reshape(points, [-1, line])
     return points
 
 

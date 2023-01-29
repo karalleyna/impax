@@ -173,13 +173,13 @@ def main(argv):
         )
         output_dirs = [os.path.dirname(f) + "/" for f in output_dirs]
     output_dirs.sort()  # So randomize with a fixed seed always results in the same order
-    splits = {x.split("/")[-4] for x in output_dirs}
+    splits = {x.split("/")[-3] for x in output_dirs}
     if "optimized" in splits:
         raise ValueError(
             'The keyword "optimized" cannot be used for a split name, it is reserved.'
         )
     for split in splits:
-        elements_of_split = [x for x in output_dirs if x.split("/")[-4] == split]
+        elements_of_split = [x for x in output_dirs if x.split("/")[-3] == split]
         with open(f"{FLAGS.dataset_directory}/{split}.txt", "wt") as f:
             f.write("\n".join(elements_of_split) + "\n")
     log.info("Done!")
@@ -195,7 +195,7 @@ def main(argv):
             os.mkdir(opt_dir)
         for split in splits:
             log.info(f"Optimizing split {split}...")
-            elements_of_split = [x for x in output_dirs if x.split("/")[-4] == split]
+            elements_of_split = [x for x in output_dirs if x.split("/")[-3] == split]
             examples_per_shard = 64
             # Make sure shards are totally random:
             random.shuffle(elements_of_split)

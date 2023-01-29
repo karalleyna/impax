@@ -10,6 +10,7 @@ def get_config():
     config.hyo = False
     config.hyp = False
     config.num_shape_elements = 32
+    config.batch_size = 4
     config.num_blobs = 16
     config.loss = "unsbbgi"
     config.maxpool_feature = 512

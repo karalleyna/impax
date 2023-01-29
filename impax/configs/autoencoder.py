@@ -7,8 +7,9 @@ import optax
 
 def get_config():
     config = ml_collections.ConfigDict()
+    config.log_every_steps = 1
     # [ob]: Whether to optimize the blobs.
-    config.optimize_blobs = "t"
+    config.optimize_blobs = True
     # [cp]: The constant prediction mode.
     # 'a': abs
     # 's': sigmoid.

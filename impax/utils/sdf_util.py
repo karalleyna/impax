@@ -30,16 +30,14 @@ def apply_class_transfer(sdf, model_config, soft_transfer, offset, dtype=None):
         sdf -= offset
     if soft_transfer:
         # todo: this should enable trainable hardness but not possible
-        if model_config.hparams.lhdn == "t":
-            hardness = model_config.hparams.hdn
+        if model_config.learn_sigmoid_normalization:
+            hardness = model_config.hardness
         else:
-            hardness = model_config.hparams.hdn
+            hardness = model_config.hardness
         return jax.nn.sigmoid(hardness * sdf)
     else:
         if dtype is None or dtype == float:
-            return jax.lax.convert_element_type(
-                sdf > 0.0, float
-            )  # tf.cast(sdf > 0.0, dtype=tf.float32)
+            return jnp.array(sdf > 0.0).astype(jnp.float32)
         else:
             return sdf > 0.0
 

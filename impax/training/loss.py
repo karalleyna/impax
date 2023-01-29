@@ -56,7 +56,7 @@ def element_center_lowres_grid_inside_loss(
 ):
     """Loss that element centers should lie within a voxel of the GT inside."""
     element_centers = structured_implicit.element_centers
-    gt_sdf_at_centers, _ = interpolate_util.interpolate(
+    gt_sdf_at_centers = interpolate_util.interpolate(
         training_example.grid, element_centers, training_example.world2grid
     )
     gt_sdf_at_centers = jnp.where(
@@ -182,7 +182,7 @@ def shape_element_center_loss(model_config, training_example, structured_implici
     bounding_box_error = jnp.mean(
         bounding_box_constraint_error(element_centers, bounding_box),
         axis=-1,
-        keep_dims=True,
+        keepdims=True,
     )
     center_is_inside_gt_box = bounding_box_error <= 0.0
     inside_prediction_weights = model_config.nerfify_occnet * jnp.array(
@@ -356,7 +356,7 @@ def compute_loss(model_config, training_example, structured_implicit):
             losses.append(loss)
     # There must be at least one loss:
     assert losses
-    return jnp.add(losses)
+    return sum(losses)
 
 
 def set_loss(model_config, training_example, structured_implicit):

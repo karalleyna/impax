@@ -12,9 +12,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-
-from impax.utils import base_util
-from impax.utils import mesh_util
+from impax.utils import base_util, logging_util, mesh_util
 
 glob = base_util.FS.glob
 exists = base_util.FS.exists
@@ -23,7 +21,7 @@ makedirs = base_util.FS.makedirs
 cp = base_util.FS.cp
 rm = base_util.FS.rm
 open_file = base_util.FS.open
-log = base_util.LOG
+log = logging_util.log
 
 
 def readlines(p):

@@ -1,17 +1,15 @@
-"""Code for preprocessing training examples.
+"""
+Code for preprocessing training examples.
 
 This code can be aware of the existence of individual datasets, but it can't be
 aware of their internals.
 """
 
+import jax.numpy as jnp
 import tensorflow as tf
 
-# LDIF is an internal package, should be imported last.
-# pylint: disable=g-bad-import-order
 from impax.datasets import shapenet
 from impax.utils import random_util
-
-# pylint: enable=g-bad-import-order
 
 
 # Main entry point for preprocessing. This code uses the model config to
@@ -23,6 +21,40 @@ def preprocess(model_config, dataset, split):
     """Generates a training example object from the model config."""
     # TODO(kgenova) Check if dataset is shapenet. If so, return a ShapeNet
     # training example.
+
+    # Get the input data from the input_fn.
+    if split != "train":
+        model_config.batch_size = 1
+
+    if model_config.rescaling != 1.0:
+        def new_dataset():
+            return 0
+        factor = model_config.rescaling
+        new_dataset.factor = factor
+        new_dataset.xyz_render = dataset.xyz_render * factor
+        new_dataset.near_surface_samples = dataset.near_surface_samples * factor
+        new_dataset.bounding_box_samples = dataset.bounding_box_samples * factor
+        xyz = dataset.surface_point_samples[:, :, :3] * factor
+        nrm = dataset.surface_point_samples[:, :, 3:]
+        new_dataset.surface_point_samples = jnp.concatenate([xyz, nrm], axis=-1)
+        new_dataset.grid = dataset.grid * factor
+        to_old_world = jnp.array(
+            [
+                [
+                    [1.0 / factor, 0.0, 0.0, 0.0],
+                    [0.0, 1.0 / factor, 0.0, 0.0],
+                    [0.0, 0.0, 1.0 / factor, 0.0],
+                    [0.0, 0.0, 0.0, 0.0],
+                ]
+            ],
+            dtype=jnp.float32,
+        )
+        to_old_world = jnp.tile(to_old_world, [model_config.batch_size, 1, 1])
+        new_dataset.world2grid = jnp.matmul(dataset.world2grid, to_old_world)
+        new_dataset.mesh_name = dataset.mesh_name
+        new_dataset.depth_render = dataset.depth_render
+        dataset = new_dataset
+
     training_example = shapenet.ShapeNetExample(model_config, dataset, split)
 
     # TODO(kgenova) Look at the model config and verify that nothing is missing.

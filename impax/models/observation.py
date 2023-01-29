@@ -10,19 +10,19 @@ class Observation(object):
         if "p" in sampling_scheme:
             # Then we have access to a point cloud as well:
             self._surface_points = jnp.array(
-                training_example.all_surface_points.numpy()
+                training_example.all_surface_points
             )
             sampling_scheme = sampling_scheme.replace("p", "")
         if "q" in sampling_scheme:
             self._surface_points = jnp.array(
-                training_example.all_surface_points_from_depth.numpy()
+                training_example.all_surface_points_from_depth
             )
             sampling_scheme = sampling_scheme.replace("q", "")
         if "n" in sampling_scheme:
             # Then we have access to normals:
             if "q" in sampling_scheme:
                 raise ValueError("Can't combine normals with xyz from depth.")
-            self._normals = jnp.array(training_example.all_normals.numpy())
+            self._normals = jnp.array(training_example.all_normals)
             sampling_scheme = sampling_scheme.replace("n", "")
         else:
             self._normals = None
@@ -42,7 +42,7 @@ class Observation(object):
             channel_count = 3
         elif sampling_scheme == "im1d":
             if "ShapeNetNSSDodecaSparseLRGMediumSlimPC" in training_example.proto_name:
-                tensor = training_example.depth_renders[:, idx : idx + 1, ...]
+                tensor = training_example.depth_renders[:, idx: idx + 1, ...]
             elif (
                 training_example.proto_name == "ShapeNetOneImXyzPC"
                 or "Waymo" in training_example.proto_name
@@ -51,12 +51,12 @@ class Observation(object):
             num_images = 1
             channel_count = 1
         elif sampling_scheme == "im1l":
-            tensor = training_example.lum_renders[:, idx : idx + 1, ...]
+            tensor = training_example.lum_renders[:, idx: idx + 1, ...]
             num_images = 1
             channel_count = 1
         elif sampling_scheme == "im1xyz":
             if "ShapeNetNSSDodecaSparseLRGMediumSlimPC" in training_example.proto_name:
-                tensor = training_example.xyz_renders[:, idx : idx + 1, ...]
+                tensor = training_example.xyz_renders[:, idx: idx + 1, ...]
             elif (
                 training_example.proto_name == "ShapeNetOneImXyzPC"
                 or "Waymo" in training_example.proto_name
@@ -85,7 +85,7 @@ class Observation(object):
                 "Unrecognized samp: %s -> %s" % (model_config.samp, sampling_scheme)
             )
         tensor = jnp.reshape(
-            tensor.numpy(),
+            tensor,
             [
                 model_config.batch_size,
                 num_images,

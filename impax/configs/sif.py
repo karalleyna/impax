@@ -39,7 +39,7 @@ def get_backward_compatible_config():
             "fix_pointnet": False,
             "maxpool_feature": 1024,
             "use_pointnet": True,
-            "data_augmentation": False,
+            "data_augmentation": "f",
             "crop_input": False,
             "num_input_crops": 1024,
             "crop_loss": False,
@@ -74,7 +74,7 @@ def get_config():
     config.input_width = 137
     config.proto = "ShapeNetNSSDodecaSparseLRGMediumSlimPC"
     config.sampling_scheme = "im1dpn"
-    config.implicit_architecture = "2"
+    config.implicit_architecture = "1"
     config.cnn_architecture = "cnn"
     config.num_shape_elements = 100
     config.num_blobs = 0
@@ -83,8 +83,8 @@ def get_config():
     config.coordinates = "aa"
     config.num_sample_points = 3000
     config.balanced = False
-    config.batch_size = 16
-    config.implicit_parameter_length = 11
+    config.batch_size = 2
+    config.implicit_parameter_length = 0
     config.enable_implicit_parameters = False
     config.upweighting_factor = 10.0
     config.upweight = True

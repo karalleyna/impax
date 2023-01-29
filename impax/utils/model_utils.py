@@ -13,8 +13,7 @@ ModuleDef = Any
 
 class TwinInference(nn.Module):
     inference_fn: Callable
-    element_count: int
-    element_embedding_length: int
+    element_embedding_length: int  # model_config.hparams.ips
     flat_element_length: int
 
     @nn.compact
@@ -198,7 +197,6 @@ class Embedder(nn.Module):
     @nn.compact
     def __call__(self, x):
         batch_size, image_count, height, width, channel_count = x.shape
-        log.info(msg="Input shape to early-fusion cnn: %s" % str(x.shape))
         if image_count == 1:
             im = jnp.reshape(x, [batch_size, height, width, channel_count])
         else:

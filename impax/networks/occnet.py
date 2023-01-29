@@ -21,7 +21,6 @@ class CBNLayer(nn.Module):
     """
 
     sample_embedding_length: int
-    is_training: bool = True
     name: str = ""
 
     @nn.compact
@@ -36,30 +35,18 @@ class CBNLayer(nn.Module):
         batch_mean = jnp.mean(sample_embeddings, axis=(1, 2))
         batch_variance = jnp.var(sample_embeddings, axis=(1, 2))
 
-        assert batch_mean.shape == (batch_size,) and batch_variance.shape == (
-            batch_size,
-        )
+        assert batch_mean.shape == (batch_size,) and batch_variance.shape == (batch_size,)
         reduced_batch_mean = jnp.mean(batch_mean)
         reduced_batch_variance = jnp.mean(batch_variance)
 
-        running_mean = self.variable(
-            "stats", "running_mean_" + self.name + "rmean", init_fn=lambda: 0.0
-        )
-        running_variance = self.variable(
-            "stats", "running_mean_" + self.name + "rvar", init_fn=lambda: 0.0
-        )
-
-        if self.is_training:
+        running_mean = self.variable("batch_stats", "running_mean_" + self.name + "rmean", init_fn=lambda: 0.0)
+        running_variance = self.variable("batch_stats", "running_mean_" + self.name + "rvar", init_fn=lambda: 0.0)
+        if self.is_mutable_collection("batch_stats"):
             running_mean.value = 0.995 * running_mean.value + 0.005 * reduced_batch_mean
-            running_variance.value = (
-                0.995 * running_variance.value + 0.005 * reduced_batch_variance
-            )
+            running_variance.value = 0.995 * running_variance.value + 0.005 * reduced_batch_variance
 
         denom = jnp.sqrt(running_variance.value + SQRT_EPS)
-        out = (
-            gamma[:, None, ...] * ((sample_embeddings - running_mean.value) / denom)
-            + beta[:, None, ...]
-        )
+        out = gamma[:, None, ...] * ((sample_embeddings - running_mean.value) / denom) + beta[:, None, ...]
 
         return out
 
@@ -77,8 +64,7 @@ class ResnetLayer(nn.Module):
     """
 
     sample_embedding_length: int
-    fon: str = "t"
-    is_training: bool = True
+    fix_occnet: bool
     name: str = ""
     activation: nn.Module = nn.relu
 
@@ -86,26 +72,22 @@ class ResnetLayer(nn.Module):
     def __call__(self, shape_embedding, sample_embeddings):
         assert self.sample_embedding_length == sample_embeddings.shape[2]
         init_sample_embeddings = sample_embeddings
-        sample_embeddings = CBNLayer(
-            self.sample_embedding_length, self.is_training, self.name + "_cbn"
-        )(shape_embedding, sample_embeddings)
+        sample_embeddings = CBNLayer(self.sample_embedding_length, self.name + "_cbn")(
+            shape_embedding, sample_embeddings
+        )
 
-        if self.fon == "t":
+        if self.fix_occnet:
             init_sample_embeddings = sample_embeddings
 
         sample_embeddings = self.activation(sample_embeddings)
-        sample_embeddings = nn.Dense(features=self.sample_embedding_length)(
-            sample_embeddings
-        )
+        sample_embeddings = nn.Dense(features=self.sample_embedding_length)(sample_embeddings)
         sample_embeddings = CBNLayer(
             sample_embedding_length=self.sample_embedding_length,
-            is_training=self.is_training,
             name=self.name + "_cbn2",
         )(shape_embedding, sample_embeddings)
         sample_embeddings = self.activation(sample_embeddings)
         sample_embeddings = CBNLayer(
             sample_embedding_length=self.sample_embedding_length,
-            is_training=self.is_training,
             name=self.name + "_cbn3",
         )(shape_embedding, sample_embeddings)
         return init_sample_embeddings + sample_embeddings
@@ -126,10 +108,9 @@ class Decoder(nn.Module):
     """
 
     sample_embedding_length: int  # model_config.hparams.ips
-    resnet_layer_count: int = 1  # model_config.hparams.orc
-    apply_sigmoid: bool = True
-    fon: str = "t"  # model_config.hparams.orc
-    is_training: bool = True
+    resnet_layer_count: int  # model_config.hparams.orc
+    fix_occnet: bool  # model_config.hparams.orc
+    apply_sigmoid: bool  # apply sigmoid or not
     name: str = ""
     activation: nn.Module = nn.relu
 
@@ -149,14 +130,12 @@ class Decoder(nn.Module):
         for i in range(self.resnet_layer_count):
             sample_embeddings = ResnetLayer(
                 sample_embedding_length=self.sample_embedding_length,
-                fon=self.fon,
-                is_training=self.is_training,
+                fix_occnet=self.fix_occnet,
                 name=self.name + f"_resnet_{i}",
                 activation=self.activation,
             )(embedding, sample_embeddings)
         sample_embeddings = CBNLayer(
             sample_embedding_length=self.sample_embedding_length,
-            is_training=self.is_training,
             name=self.name + "_cb1",
         )(embedding, sample_embeddings)
         vals = nn.Dense(1)(sample_embeddings)
@@ -168,7 +147,6 @@ class Decoder(nn.Module):
 class OCCNet(nn.Module):
     sample_embedding_length: int  # model_config.hparams.ips
     resnet_layer_count: int = 1  # model_config.hparams.orc
-    is_training: bool = True
     apply_sigmoid: bool = False
     activation: nn.Module = nn.relu
 
@@ -200,18 +178,13 @@ class OCCNet(nn.Module):
                 repr(embedding.shape),
                 repr(samples.shape),
             )
-            assert (
-                embedding.shape[0] == 1
-                and samples.shape[0] == 1
-                and samples.shape[2] == 3
-            )
+            assert embedding.shape[0] == 1 and samples.shape[0] == 1 and samples.shape[2] == 3
 
             vals = Decoder(
                 self.sample_embedding_length,
                 self.resnet_layer_count,
                 self.apply_sigmoid,
                 self.fon,
-                self.is_training,
                 name="occnet1",
                 activation=self.activation,
             )(embedding, samples)
@@ -224,7 +197,6 @@ class OCCNet(nn.Module):
             self.resnet_layer_count,
             self.apply_sigmoid,
             self.fon,
-            self.is_training,
             name="occnet2",
             activation=self.activation,
         )(embedding, samples)

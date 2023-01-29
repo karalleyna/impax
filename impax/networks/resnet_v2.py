@@ -58,16 +58,16 @@ class BottleneckResNetBlock(nn.Module):
     @nn.compact
     def __call__(self, x):
         residual = x
-        y = self.norm()(x)
+        y = self.norm(name=f"bn_{self.name}0")(x)
         y = self.activation(y)
 
         tmp = y.copy()
 
         y = self.conv(self.filters, (1, 1))(y)
-        y = self.norm()(y)
+        y = self.norm(name=f"bn_{self.name}1")(y)
         y = self.activation(y)
         y = self.conv(self.filters, (3, 3), self.strides)(y)
-        y = self.norm()(y)
+        y = self.norm(name=f"bn_{self.name}2")(y)
         y = self.activation(y)
         y = self.conv(self.filters * 4, (1, 1))(y)
 
@@ -92,11 +92,11 @@ class ResNet(nn.Module):
     return_intermediates: bool = True
 
     @nn.compact
-    def __call__(self, x, train: bool = True):
+    def __call__(self, x):
         conv = partial(self.conv, use_bias=False, dtype=self.dtype)
         norm = partial(
             nn.BatchNorm,
-            use_running_average=not train,
+            use_running_average=not self.is_mutable_collection("batch_stats"),
             momentum=0.9,
             epsilon=1e-5,
             dtype=self.dtype,
@@ -118,6 +118,7 @@ class ResNet(nn.Module):
                     conv=conv,
                     norm=norm,
                     activation=self.activation,
+                    name=f"block_{i}{j}"
                 )(x)
             intermediates.append(x)
         x = jnp.mean(x, axis=(1, 2))
