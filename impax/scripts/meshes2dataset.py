@@ -21,14 +21,14 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
     "mesh_directory",
-    "/Users/burak/Desktop/repos/impax/impax/data",
+    "./impax/data",
     "Path to meshes. This folder should"
     " have the structure <root>/{train,test,val}/<class>/*.ply",
 )
 
 flags.DEFINE_string(
     "dataset_directory",
-    "/Users/burak/Desktop/repos/impax/impax/data2",
+    "./impax/datadir",
     "Path to output dataset.",
 )
 
