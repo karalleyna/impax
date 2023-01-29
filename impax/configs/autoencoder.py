@@ -8,6 +8,7 @@ import optax
 def get_config():
     config = ml_collections.ConfigDict()
     config.log_every_steps = 1
+    config.n_epochs = 4
     # [ob]: Whether to optimize the blobs.
     config.optimize_blobs = True
     # [cp]: The constant prediction mode.

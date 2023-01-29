@@ -4,12 +4,13 @@ import glob
 import os
 
 import tensorflow as tf
+from jax import random
 
 from impax.datasets import process_elements
 from impax.utils.file_util import log
 
 
-def _make_optimized_dataset(directory, batch_size, mode, split):
+def _make_optimized_dataset(directory, batch_size, mode, split, key):
     filenames = glob.glob(f"{directory}/optimized/{split}/*.tfrecords")
     log.info(f"Making dataset from the following files: {filenames}")
     dataset = tf.data.TFRecordDataset(
@@ -21,13 +22,14 @@ def _make_optimized_dataset(directory, batch_size, mode, split):
     log.info("Mapping...")
     if mode == "train":
         dataset = dataset.shuffle(buffer_size=2 * batch_size)
-        dataset = dataset.repeat()
+    dataset = dataset.repeat()
 
     dataset = dataset.map(process_elements.parse_tf_example, num_parallel_calls=os.cpu_count())
 
     dataset = dataset.batch(batch_size, drop_remainder=True).prefetch(1)
     for data in iter(dataset):
-        yield build_dataset_obj(data, batch_size)
+        key, next_key = random.split(key)
+        yield (build_dataset_obj(data, batch_size), next_key)
 
 
 def build_dataset_obj(dataset_items, bs):

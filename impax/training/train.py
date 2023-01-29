@@ -9,8 +9,9 @@ import jax
 import ml_collections
 from flax.training import checkpoints, train_state
 from jax import random
+from tqdm import tqdm
 
-from impax.configs.ldif import get_config
+from impax.configs.sif import get_config
 from impax.datasets.local_inputs import _make_optimized_dataset
 from impax.datasets.preprocess import preprocess
 from impax.models.model import StructuredImplicitModel
@@ -26,9 +27,9 @@ def create_model(model_config, key):
 
 def initialized(key, model, model_config):
     dataset = _make_optimized_dataset(
-        "/Users/burak/Desktop/repos/impax/impax/data2", model_config.batch_size, "train", "train"
+        "/Users/burak/Desktop/repos/impax/impax/data2", model_config.batch_size, "train", "train", key=key
     )
-    data = preprocess(model_config, next(dataset), "train")
+    data = preprocess(model_config, next(dataset)[0], "train", key)
     observation = Observation(model_config, data)
 
     variables = model.init(key, observation)
@@ -74,6 +75,8 @@ def train_step(state, batch, model, model_config):
 
 def eval_step(state, batch, model_config):
     model_config.train = False
+
+    model_config.batch_size = 1
     obs, training_ex = batch
     variables = {"params": state.params, "batch_stats": state.batch_stats}
     predictions = state.apply_fn(variables, obs, mutable=False)
@@ -122,14 +125,18 @@ def train_and_evaluate(model_config: ml_collections.ConfigDict, workdir: str) ->
 
     key = random.PRNGKey(0)
 
-    train_iter = _make_optimized_dataset(
-        "/Users/burak/Desktop/repos/impax/impax/data2", model_config.batch_size, "train", "train"
+    key, train_data_key, eval_data_key = random.split(key, 3)
+
+    train_dataset = _make_optimized_dataset(
+        "/Users/burak/Desktop/repos/impax/impax/data2", model_config.batch_size, "train", "train", train_data_key
     )
-    train_iter = map(lambda x: preprocess(model_config, x, split="train"), train_iter)
+    train_iter = map(lambda x_key: preprocess(model_config, x_key[0], split="train", key=x_key[1]), train_dataset)
     train_iter = map(lambda x: (Observation(model_config, x), x), train_iter)
 
-    eval_iter = _make_optimized_dataset("/Users/burak/Desktop/repos/impax/impax/data2", 1, "eval", "val")
-    eval_iter = map(lambda x: preprocess(model_config, x, split="eval"), eval_iter)
+    eval_dataset = _make_optimized_dataset(
+        "/Users/burak/Desktop/repos/impax/impax/data2", 1, "eval", "val", eval_data_key
+    )
+    eval_iter = map(lambda x_key: preprocess(model_config, x_key[0], split="eval", key=x_key[1]), eval_dataset)
     eval_iter = map(lambda x: (Observation(model_config, x), x), eval_iter)
 
     # todo: do
@@ -145,44 +152,44 @@ def train_and_evaluate(model_config: ml_collections.ConfigDict, workdir: str) ->
     key, init_key = random.split(key)
     state = create_train_state(init_key, model_config, model)
     state = restore_checkpoint(state, workdir)
-    # step_offset > 0 if restarting from checkpoint
-    step_offset = int(state.step)
 
-    train_loss = []
     model_config.train = True
     log.warning("Initial compilation, this might take some minutes...")
-    for step, batch in zip(range(step_offset, num_steps), train_iter):
-        state, loss = train_step(state, batch, model, model_config)
 
-        if step == step_offset:
-            log.info("Initial compilation completed.")
+    for epoch in range(model_config.n_epochs):
+        pbar: tqdm = tqdm(zip(range(0, steps_per_epoch), train_iter), total=steps_per_epoch)
+        train_loss = []
 
-        train_loss.append(loss)
-        if (step + 1) % model_config.log_every_steps == 0:
-            log.warning(
-                "eval epoch: %d, loss: %.4f",
-                step,
-                sum(train_loss) / len(train_loss),
-            )
+        for step, batch in pbar:
+            state, loss = train_step(state, batch, model, model_config)
 
-        if (step + 1) % steps_per_epoch == 0:
-            epoch = step // steps_per_epoch
-            eval_loss = []
+            train_loss.append(loss)
+            if (step + 1) % model_config.log_every_steps == 0:
+                pbar.set_description(f"Epoch: {epoch} ")
+                pbar.set_postfix({"train loss": sum(train_loss) / len(train_loss)})
 
-            # sync batch statistics across replicas
-            for _ in range(steps_per_eval):
-                eval_batch = next(eval_iter)
-                loss = eval_step(state, eval_batch, model_config)
-                eval_loss.append(loss)
+            if (step + 1) % steps_per_epoch == 0:
+                epoch = step // steps_per_epoch
+                eval_loss = []
 
-            log.warning(
-                "eval epoch: %d, loss: %.4f",
-                epoch,
-                sum(eval_loss) / len(eval_loss),
-            )
+                # sync batch statistics across replicas
+                pbs = model_config.batch_size
+                model_config.batch_size = 1
+                for _ in range(steps_per_eval):
+                    eval_batch = next(eval_iter)
+                    loss = eval_step(state, eval_batch, model_config)
+                    eval_loss.append(loss)
+                model_config.batch_size = pbs
 
-        if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
-            save_checkpoint(state, workdir)
+                pbar.set_postfix(
+                    {
+                        "train loss": sum(train_loss[-steps_per_epoch:]) / steps_per_epoch,
+                        "eval loss": sum(eval_loss) / len(eval_loss),
+                    }
+                )
+
+            if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
+                save_checkpoint(state, workdir)
 
     return state
 

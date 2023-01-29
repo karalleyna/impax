@@ -17,18 +17,18 @@ from impax.utils import random_util
 # it should dispatch generation to a dataset to handle internals, and verify
 # that the training example contains the properties associated with the config.
 # But it doesn't care about anything else.
-def preprocess(model_config, dataset, split):
+def preprocess(model_config, dataset, split, key):
     """Generates a training example object from the model config."""
     # TODO(kgenova) Check if dataset is shapenet. If so, return a ShapeNet
     # training example.
 
     # Get the input data from the input_fn.
-    if split != "train":
-        model_config.batch_size = 1
 
     if model_config.rescaling != 1.0:
+
         def new_dataset():
             return 0
+
         factor = model_config.rescaling
         new_dataset.factor = factor
         new_dataset.xyz_render = dataset.xyz_render * factor
@@ -55,7 +55,7 @@ def preprocess(model_config, dataset, split):
         new_dataset.depth_render = dataset.depth_render
         dataset = new_dataset
 
-    training_example = shapenet.ShapeNetExample(model_config, dataset, split)
+    training_example = shapenet.ShapeNetExample(model_config, dataset, split, key)
 
     # TODO(kgenova) Look at the model config and verify that nothing is missing.
     if model_config.data_augmentation == "f":

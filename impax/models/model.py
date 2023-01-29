@@ -97,6 +97,15 @@ class StructuredImplicitModel(nn.Module):
 
         if self.model_config.enable_implicit_parameters:
             self.single_element_implicit_eval_fun = self.make_eval_fun()
+            sample_count = (
+                self.model_config.num_subsampled_points
+                if self.model_config.loss_receptive_field == "x"
+                else self.model_config.num_sample_points
+            )
+            _ = self.eval_implicit_parameters(
+                jnp.ones((self.model_config.batch_size, num_elements, implicit_parameter_length)),
+                jnp.ones((self.model_config.batch_size, num_elements, sample_count, 3)),
+            )
         else:
             self.single_element_implicit_eval_fun = None
 
@@ -130,22 +139,6 @@ class StructuredImplicitModel(nn.Module):
                 implicit_parameter_length,
                 flat_element_length,
             )
-
-        """implicit_parameters: Tensor with shape [batch_size, element_count,
-            element_embedding_length]. The embedding associated with each element.
-          samples: Tensor with shape [batch_size, element_count, sample_count, 3].
-            The sample locations. Each embedding vector will be decoded at each of
-            its sample locations."""
-
-        sample_count = (
-            self.model_config.num_subsampled_points
-            if self.model_config.loss_receptive_field == "x"
-            else self.model_config.num_sample_points
-        )
-        _ = self.eval_implicit_parameters(
-            jnp.ones((self.model_config.batch_size, num_elements, implicit_parameter_length)),
-            jnp.ones((self.model_config.batch_size, num_elements, sample_count, 3)),
-        )
 
     def _global_local_forward(self, observation):
         """A forward pass that include both template and element inference."""

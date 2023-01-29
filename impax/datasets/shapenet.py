@@ -137,7 +137,7 @@ class BoundingBox(object):
 class ShapeNetExample(object):
     """A single ShapeNet shape as a training example."""
 
-    def __init__(self, model_config, dataset, split):
+    def __init__(self, model_config, dataset, split, key):
         """Preprocesses a batch of shapenet training examples."""
         self._depth_renders = None
         self._lum_renders = None
@@ -151,7 +151,7 @@ class ShapeNetExample(object):
         self._random_lum_render = None
         self._all_surface_points_from_depth = None
         self._dataset = dataset
-        self.key = jax.random.PRNGKey(0)
+        self.key = key
         # if hasattr(ds, 'surface_point_samples'):
         # if (model_config.inputs['proto'] in
         #     [
@@ -160,6 +160,7 @@ class ShapeNetExample(object):
         points_length = 10000
         # else:
         #   points_length = 100000
+
         self._full_zero_set_points_and_normals = jnp.reshape(
             jnp.array(dataset.surface_point_samples), [model_config.batch_size, points_length, 6]
         )
