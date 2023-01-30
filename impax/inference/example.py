@@ -11,14 +11,7 @@ from scipy.ndimage import interpolation
 
 # local
 from impax.inference import util as inference_util
-from impax.utils import (
-    file_util,
-    gaps_util,
-    geom_util,
-    geom_util_jnp,
-    jnp_util,
-    path_util,
-)
+from impax.utils import file_util, gaps_util, geom_util, geom_util_jnp, jnp_util, path_util
 from impax.utils.file_util import log
 
 synset_to_cat = {
@@ -65,9 +58,7 @@ class ExampleGenerator(object):
 
     def __init__(self, is_local):
         if is_local:
-            self.path = os.path.join(
-                path_util.get_path_to_ldif_root(), "data/hashlist.csv"
-            )
+            self.path = os.path.join(path_util.get_path_to_ldif_root(), "data/hashlist.csv")
         else:
             raise ValueError("Remote hashlist no longer supported.")
         with file_util.open_file(self.path, "rt") as f:
@@ -147,9 +138,7 @@ def _get_world_pts_from_idx(
 class InferenceExample(object):
     """A dataset example for inference-time use."""
 
-    def __init__(
-        self, split, synset_or_cat, mesh_hash=None, dynamic=False, verbose=True
-    ):
+    def __init__(self, split, synset_or_cat, mesh_hash=None, dynamic=False, verbose=True):
         self.split = split
         self.synset, self.cat = _parse_synset_or_cat(synset_or_cat)
         self.mesh_hash = mesh_hash
@@ -188,9 +177,7 @@ class InferenceExample(object):
 
     @classmethod
     def from_local_dataset_tokens(cls, model_directory, split, class_name, mesh_name):
-        return cls.from_directory(
-            os.path.join(model_directory, split, class_name, mesh_name)
-        )
+        return cls.from_directory(os.path.join(model_directory, split, class_name, mesh_name))
 
     @classmethod
     def from_directory(cls, dirpath, verbose=True):
@@ -216,9 +203,7 @@ class InferenceExample(object):
         ex._directory_root = dirpath
         ex._grid_path = f"{dirpath}/coarse_grid.grd"
         # pylint: enable=protected-access
-        ex.precomputed_surface_samples_from_dodeca_path = (
-            f"{dirpath}/surface_samples_from_dodeca.pts"
-        )
+        ex.precomputed_surface_samples_from_dodeca_path = f"{dirpath}/surface_samples_from_dodeca.pts"
         ex.is_from_directory = True
         return ex
 
@@ -229,10 +214,7 @@ class InferenceExample(object):
         inst = cls(split, synset, mesh_hash)
         if inst.npz_path != npz_path:
             raise ValueError(
-                (
-                    "Internal error: provided npz path is a mismatch"
-                    " with generated one: %s vs %s"
-                )
+                ("Internal error: provided npz path is a mismatch" " with generated one: %s vs %s")
                 % (inst.npz_path, npz_path)
             )
         return inst
@@ -246,8 +228,12 @@ class InferenceExample(object):
         return inst
 
     @property
+    def data_dir(self):
+        return "./impax/datadir"
+
+    @property
     def npz_path(self):
-        return "/DATA_PATH/shapenet-occnet/%s/%s/%s.npz" % (
+        return f"{self.data_dir}/%s/%s/%s.npz" % (
             self.split,
             self.synset,
             self.mesh_hash,
@@ -255,31 +241,31 @@ class InferenceExample(object):
 
     @property
     def surface_samples_path(self):
-        sp = self.npz_path.replace(
-            "/shapenet-occnet/", "/shapenet-occnet/surface-points/"
-        ).replace(".npz", "/surface_points.npy")
+        sp = self.npz_path.replace(f"{self.data_dir}", f"{self.data_dir}/surface-points/").replace(
+            ".npz", "/surface_points.npy"
+        )
         return sp
 
     @property
     def grid_path(self):
         if not hasattr(self, "_grid_path"):
-            self._grid_path = self.surface_samples_path.replace(
-                "/surface-points/", "/lowres-grids/"
-            ).replace("/surface_points.npy", "/lowres_grid.grd")
+            self._grid_path = self.surface_samples_path.replace("/surface-points/", "/lowres-grids/").replace(
+                "/surface_points.npy", "/lowres_grid.grd"
+            )
         return self._grid_path
 
     @property
     def dodeca_depth_and_normal_path(self):
         if not hasattr(self, "_dodeca_depth_and_normal_path"):
             self._dodeca_depth_and_normal_path = (
-                f"/DATA_PATH" f"/{self.split}/{self.synset}/{self.mesh_hash[:-1]}.npz"
+                self.data_dir + f"/{self.split}/{self.synset}/{self.mesh_hash[:-1]}.npz"
             )
         return self._dodeca_depth_and_normal_path
 
     @property
     def r2n2_depth_dir(self):
         """The directory containing the GT r2n2 depth images."""
-        root = "/DATA_PATH/3dr2n2-renders/3dr2n2/"
+        root = f"{self.data_dir}/3dr2n2-renders/3dr2n2/"
         if self.depth_native_res == 137:
             depth_dir = root + "depth-137/%s/%s" % (self.synset, self.mesh_hash)
         elif self.depth_native_res == 224:
@@ -293,13 +279,13 @@ class InferenceExample(object):
 
     @property
     def r2n2_cam2v1_path(self):
-        root = "/DATA_PATH/3dr2n2-renders/3dr2n2/"
+        root = f"{self.data_dir}/3dr2n2-renders/3dr2n2/"
         cam_path = root + "cams/%s/%s.cam" % (self.synset, self.mesh_hash)
         return cam_path
 
     @property
     def v12occnet_path(self):
-        root = "/DATA_PATH/v1shapenet2occnet/"
+        root = f"{self.data_dir}/v1shapenet2occnet/"
         path = root + "%s/%s.npy" % (self.synset, self.mesh_hash)
         return path
 
@@ -342,18 +328,14 @@ class InferenceExample(object):
     @property
     def rgb_image(self):
         if self._rgb_image is None:
-            self._rgb_image = inference_util.read_png_to_float_npy_with_reraising(
-                self.rgb_path
-            )
+            self._rgb_image = inference_util.read_png_to_float_npy_with_reraising(self.rgb_path)
             self._rgb_image = jnp.reshape(self._rgb_image, [1, 137, 137, 4])[..., :3]
         return self._rgb_image
 
     @property
     def r2n2_images(self):
         if self._r2n2_images is None:
-            self._r2n2_images = jnp.reshape(
-                self._archive["rgb_3dr2n2"], [24, 137, 137, 4]
-            )
+            self._r2n2_images = jnp.reshape(self._archive["rgb_3dr2n2"], [24, 137, 137, 4])
         # log.info(list(self._archive.keys()))
         return self._r2n2_images
 
@@ -367,9 +349,7 @@ class InferenceExample(object):
     def r2n2_depth_images(self):
         if not hasattr(self, "_r2n2_depth_images"):
             if self.depth_native_res == 137:
-                self._r2n2_depth_images = gaps_util.read_depth_directory(
-                    self.r2n2_depth_dir, 24
-                )
+                self._r2n2_depth_images = gaps_util.read_depth_directory(self.r2n2_depth_dir, 24)
             elif self.depth_native_res == 224:
                 (
                     self._r2n2_depth_images,
@@ -396,9 +376,7 @@ class InferenceExample(object):
             cam_images = []
             for i in range(24):
                 # Use the inverse-transpose of the needed matrix:
-                im_i = geom_util_jnp.apply_4x4(
-                    nrm_world[i, ...], cam2world[i, :, :].T, are_points=False
-                )
+                im_i = geom_util_jnp.apply_4x4(nrm_world[i, ...], cam2world[i, :, :].T, are_points=False)
                 nrm = jnp.linalg.norm(im_i, axis=-1, keepdims=True) + 1e-10
                 im_i /= nrm
                 mask = jnp_util.make_mask(self.r2n2_depth_images[i, ...])
@@ -411,9 +389,7 @@ class InferenceExample(object):
         if not hasattr(self, "_r2n2_cam_images"):
             cam_images = []
             for i in range(24):
-                im_i = gaps_util.gaps_depth_image_to_cam_image(
-                    self.r2n2_depth_images[i, ...], self.r2n2_xfov[i]
-                )
+                im_i = gaps_util.gaps_depth_image_to_cam_image(self.r2n2_depth_images[i, ...], self.r2n2_xfov[i])
                 cam_images.append(im_i)
             self._r2n2_cam_images = jnp.stack(cam_images)
         return self._r2n2_cam_images
@@ -442,17 +418,13 @@ class InferenceExample(object):
     @property
     def r2n2_cam2v1(self):
         if not hasattr(self, "_r2n2_cam2v1"):
-            self._r2n2_cam2v1, self._r2n2_xfov = gaps_util.read_cam_file(
-                self.r2n2_cam2v1_path
-            )
+            self._r2n2_cam2v1, self._r2n2_xfov = gaps_util.read_cam_file(self.r2n2_cam2v1_path)
         return self._r2n2_cam2v1
 
     @property
     def r2n2_xfov(self):
         if not hasattr(self, "_r2n2_xfov"):
-            self._r2n2_cam2v1, self._r2n2_xfov = gaps_util.read_cam_file(
-                self.r2n2_cam2v1_path
-            )
+            self._r2n2_cam2v1, self._r2n2_xfov = gaps_util.read_cam_file(self.r2n2_cam2v1_path)
         return self._r2n2_xfov
 
     @property
@@ -477,8 +449,7 @@ class InferenceExample(object):
                 return jnp.array([x, y, z], dtype=jnp.float32)
 
             metadata_path = (
-                f"/DATA_PATH/3dr2n2-renders/"
-                f"{self.synset}/{self.mesh_hash}/rendering/rendering_metadata.txt"
+                f"{self.data_dir}/3dr2n2-renders/" f"{self.synset}/{self.mesh_hash}/rendering/rendering_metadata.txt"
             )
             lines = file_util.read_lines(metadata_path)
             self._r2n2_viewpoints = jnp.stack([compute_pose(line) for line in lines])
@@ -514,9 +485,7 @@ class InferenceExample(object):
     @property
     def gaps2v1(self):
         if not hasattr(self, "_gaps2v1"):
-            self._gaps2v1 = jnp.reshape(
-                jnp.matmul(self.occnet2v1, self.gaps2occnet), [4, 4]
-            ).astype(jnp.float32)
+            self._gaps2v1 = jnp.reshape(jnp.matmul(self.occnet2v1, self.gaps2occnet), [4, 4]).astype(jnp.float32)
         return self._gaps2v1
 
     @property
@@ -566,9 +535,7 @@ class InferenceExample(object):
                 nrm = jnp.linalg.norm(im_i, axis=-1, keepdims=True) + 1e-10
                 im_i /= nrm
                 mask = jnp_util.make_mask(self.depth_images[0, i, ...])
-                world_normals.append(
-                    jnp_util.zero_by_mask(mask, im_i).astype(jnp.float32)
-                )
+                world_normals.append(jnp_util.zero_by_mask(mask, im_i).astype(jnp.float32))
             self._world_normal_images = jnp.stack(world_normals)
         return self._world_normal_images
 
@@ -608,9 +575,7 @@ class InferenceExample(object):
                     are_points=True,
                 )
                 mask = jnp_util.make_mask(self.depth_images[0, i, ...])
-                world_images.append(
-                    jnp_util.zero_by_mask(mask, im_i).astype(jnp.float32)
-                )
+                world_images.append(jnp_util.zero_by_mask(mask, im_i).astype(jnp.float32))
             self._world_xyz_images_from_dodeca = jnp.stack(world_images)
         return self._world_xyz_images_from_dodeca
 
@@ -676,28 +641,20 @@ class InferenceExample(object):
     def precomputed_surface_samples_from_dodeca(self):
         if not hasattr(self, "_precomputed_surface_samples_from_dodeca"):
             if not self.is_from_directory:
-                raise ValueError(
-                    "Precomputed surface samples are only"
-                    " available with a from_directory example."
-                )
+                raise ValueError("Precomputed surface samples are only" " available with a from_directory example.")
             if not os.path.isfile(self.precomputed_surface_samples_from_dodeca_path):
                 raise ValueError(
                     "Dodeca surface samples have not been precomputed at "
                     f"{self.precomputed_surface_samples_from_dodeca_path}"
                 )
-            full_samples = gaps_util.read_pts_file(
-                self.precomputed_surface_samples_from_dodeca_path
-            )
+            full_samples = gaps_util.read_pts_file(self.precomputed_surface_samples_from_dodeca_path)
             orig_count = 100000
             assert full_samples.shape[0] == orig_count
             assert full_samples.shape[1] == 6
             assert full_samples.dtype == jnp.float32
             assert full_samples.shape[0] > 1
             while full_samples.shape[0] < self.surface_sample_count:
-                log.info(
-                    f"Doubling samples from {full_samples.shape[0]} to"
-                    f" {2*full_samples.shape[0]}"
-                )
+                log.info(f"Doubling samples from {full_samples.shape[0]} to" f" {2*full_samples.shape[0]}")
                 full_samples = jnp.tile(full_samples, [2, 1])
             self._precomputed_surface_samples_from_dodeca = full_samples[
                 jax.random.choice(
@@ -722,19 +679,12 @@ class InferenceExample(object):
             world_xyzn = jnp.concatenate([world_xyz, world_n], axis=-1)
             world_xyzn = world_xyzn[is_valid, :]
             world_xyzn = jnp.reshape(world_xyzn, [-1, 6])
-            world_xyzn = jax.random.permutation(
-                self.get_key, world_xyzn, independent=True
-            )
+            world_xyzn = jax.random.permutation(self.get_key, world_xyzn, independent=True)
             assert world_xyzn.shape[0] > 1
             while world_xyzn.shape[0] < self.surface_sample_count:
-                log.info(
-                    f"Tiling samples from {world_xyzn.shape[0]} to"
-                    f" {2*world_xyzn.shape[0]}"
-                )
+                log.info(f"Tiling samples from {world_xyzn.shape[0]} to" f" {2*world_xyzn.shape[0]}")
                 world_xyzn = jnp.tile(world_xyzn, [2, 1])
-            self._surface_samples_from_dodeca = world_xyzn[
-                : self.surface_sample_count, :
-            ]
+            self._surface_samples_from_dodeca = world_xyzn[: self.surface_sample_count, :]
         return self._surface_samples_from_dodeca
 
     def get_surface_samples(self, sample_count):
@@ -753,9 +703,7 @@ class InferenceExample(object):
                 # log.info(f'The points have shape {nss.shape}')
             else:
                 nss = self._archive["axis_samples"]
-            self._near_surface_samples = jnp.reshape(nss, [100000, 4]).astype(
-                jnp.float32
-            )
+            self._near_surface_samples = jnp.reshape(nss, [100000, 4]).astype(jnp.float32)
         return self._near_surface_samples
 
     @property
@@ -768,9 +716,7 @@ class InferenceExample(object):
                 # log.info(f'The uniform points have shape {uniform_samples.shape}')
             else:
                 uniform_samples = self._archive["uniform_samples"]
-            self._uniform_samples = jnp.reshape(uniform_samples, [100000, 4]).astype(
-                jnp.float32
-            )
+            self._uniform_samples = jnp.reshape(uniform_samples, [100000, 4]).astype(jnp.float32)
         return self._uniform_samples
 
     @property
@@ -792,7 +738,7 @@ class InferenceExample(object):
     @property
     def gt_path(self):
         if self._gt_path is None:
-            self._gt_path = ("/DATA_PATH/occnet-plys/" "%s/%s/%s/model_occnet.ply") % (
+            self._gt_path = (self.data_dir + "/%s/%s/%s/mesh_orig.ply") % (
                 self.split,
                 self.synset,
                 self.mesh_hash,
@@ -819,9 +765,7 @@ class InferenceExample(object):
     @property
     def tx_path(self):
         if not self._tx_path:
-            self._tx_path = (
-                "/DATA_PATH/occnet-to-gaps/" "%s/%s/%s/occnet_to_gaps.txt"
-            ) % (
+            self._tx_path = (self.data_dir + "/%s/%s/%s/orig_to_gaps.txt") % (
                 self.split,
                 self.synset,
                 self.mesh_hash,
@@ -874,7 +818,7 @@ class InferenceExample(object):
 
     @property
     def max_depth_normals_path(self):
-        return ("/DATA_PATH/max/" "depth-normals-npz/%s/%s/%s.npz") % (
+        return ("{self.data_dir}/max/" "depth-normals-npz/%s/%s/%s.npz") % (
             self.split,
             self.synset,
             self.mesh_hash,
@@ -916,9 +860,7 @@ class InferenceExample(object):
     def bts_cam_xyz(self):
         if not hasattr(self, "_bts_cam_xyz"):
             depths = self.bts_depth_480
-            self._bts_cam_xyz = gaps_util.batch_gaps_depth_image_to_cam_image(
-                depths, self.r2n2_xfov
-            )
+            self._bts_cam_xyz = gaps_util.batch_gaps_depth_image_to_cam_image(depths, self.r2n2_xfov)
         return self._bts_cam_xyz
 
     @property
@@ -929,7 +871,7 @@ class InferenceExample(object):
 
     @property
     def max_cam2occnet_path(self):
-        return ("/DATA_PATH/" "occnet_scan_64_pkls_noclip/%s/%s/%s/occnet_scan.pkl") % (
+        return ("{self.data_dir}/occnet_scan_64_pkls_noclip/%s/%s/%s/occnet_scan.pkl") % (
             self.split,
             self.synset,
             self.mesh_hash,
@@ -938,9 +880,7 @@ class InferenceExample(object):
     @property
     def max_cam2occnet(self):
         if not hasattr(self, "_max_cam2occnet"):
-            self._max_cam2occnet = file_util.read_py2_pkl(self.max_cam2occnet_path)[
-                "cam_poses"
-            ]
+            self._max_cam2occnet = file_util.read_py2_pkl(self.max_cam2occnet_path)["cam_poses"]
         return self._max_cam2occnet
 
     @property
@@ -983,28 +923,20 @@ class InferenceExample(object):
     @property
     def max_world_normals(self):
         if not hasattr(self, "_max_world_normals"):
-            self._max_world_normals = geom_util_jnp.transform_normals(
-                self.max_pred_cam_normals_512, self.max_cam2world
-            )
+            self._max_world_normals = geom_util_jnp.transform_normals(self.max_pred_cam_normals_512, self.max_cam2world)
         return self._max_world_normals
 
     @property
     def bts_world_normals(self):
         if not hasattr(self, "_bts_world_normals"):
-            self._bts_world_normals = geom_util_jnp.transform_normals(
-                self.bts_pred_cam_normals_480, self.bts_cam2world
-            )
+            self._bts_world_normals = geom_util_jnp.transform_normals(self.bts_pred_cam_normals_480, self.bts_cam2world)
         return self._bts_world_normals
 
     def get_bts_world_pts_from_idx(self, idx):
-        return _get_world_pts_from_idx(
-            idx, self.bts_depth_480, self.bts_world_xyz, self.bts_world_normals
-        )
+        return _get_world_pts_from_idx(idx, self.bts_depth_480, self.bts_world_xyz, self.bts_world_normals)
 
     def get_max_world_pts_from_idx(self, idx):
-        return _get_world_pts_from_idx(
-            idx, self.max_depth_512, self.max_world_xyz, self.max_world_normals
-        )
+        return _get_world_pts_from_idx(idx, self.max_depth_512, self.max_world_xyz, self.max_world_normals)
 
     def _batch_resize(self, ims, res, strategy="nearest"):
         """Resizes a batch of images to a new resolution."""
@@ -1017,9 +949,7 @@ class InferenceExample(object):
             ims = ims[..., jnp.newaxis]
         h, w = ims.shape[1:3]
         for i in range(bs):
-            o = interpolation.zoom(
-                ims[i, ...], [res[0] / h, res[1] / w, 1.0], jnp.float32, order=order
-            )
+            o = interpolation.zoom(ims[i, ...], [res[0] / h, res[1] / w, 1.0], jnp.float32, order=order)
             out.append(o)
         out = jnp.stack(out)
         if not has_extra_dim:
@@ -1029,34 +959,26 @@ class InferenceExample(object):
     @property
     def max_world_xyz_224(self):
         if not hasattr(self, "_max_world_xyz_224"):
-            self._max_world_xyz_224 = self._batch_resize(
-                self.max_world_xyz.copy(), (224, 224), "nearest"
-            )
+            self._max_world_xyz_224 = self._batch_resize(self.max_world_xyz.copy(), (224, 224), "nearest")
         return self._max_world_xyz_224
 
     @property
     def bts_world_xyz_224(self):
         if not hasattr(self, "_bts_world_xyz_224"):
-            self._bts_world_xyz_224 = self._batch_resize(
-                self.bts_world_xyz.copy(), (224, 224), "nearest"
-            )
+            self._bts_world_xyz_224 = self._batch_resize(self.bts_world_xyz.copy(), (224, 224), "nearest")
         return self._bts_world_xyz_224
 
     @property
     def max_world_normals_224(self):
         if not hasattr(self, "_max_world_normals_224"):
-            self._max_world_normals_224 = self._batch_resize(
-                self.max_world_normals.copy(), (224, 224), "nearest"
-            )
+            self._max_world_normals_224 = self._batch_resize(self.max_world_normals.copy(), (224, 224), "nearest")
         return self._max_world_normals_224
 
     @property
     def bts_depth_224(self):
         if not hasattr(self, "_bts_depth_224"):
             log.info("BTS depth 480 shape: %s" % repr(self.bts_depth_480.shape))
-            self._bts_depth_224 = self._batch_resize(
-                self.bts_depth_480.copy(), (224, 224), "nearest"
-            )
+            self._bts_depth_224 = self._batch_resize(self.bts_depth_480.copy(), (224, 224), "nearest")
         return self._bts_depth_224
 
     @property
@@ -1067,7 +989,7 @@ class InferenceExample(object):
             for i in range(24):
                 use_gt = False
                 if use_gt:
-                    path = ("/DATA_PATH/bts-pred/depth-gt/" "%s/%s/%s_depth.png") % (
+                    path = ("{self.data_dir}/bts-pred/depth-gt/" "%s/%s/%s_depth.png") % (
                         self.synset,
                         self.mesh_hash,
                         str(i).zfill(6),
@@ -1075,7 +997,7 @@ class InferenceExample(object):
                 else:
                     fpath = "filtered" if self.split == "train" else "filtered-val"
                     path = (
-                        "/DATA_PATH/bts-pred/%s/"
+                        "{self.data_dir}/bts-pred/%s/"
                         "3dr2n2-renders-hr_3dr2n2-renders-hr-%s-%s-rendering-%s_trimmed.png"
                     ) % (fpath, self.synset, self.mesh_hash, str(i).zfill(2))
                 ims.append(gaps_util.read_depth_im(path))
@@ -1091,13 +1013,13 @@ class InferenceExample(object):
             for i in range(24):
                 if self.split == "train":
                     path_base = (
-                        "/DATA_PATH/bts-pred/<n>/"
+                        "{self.data_dir}/bts-pred/<n>/"
                         "3dr2n2-renders-hr_3dr2n2-renders-hr-%s-"
                         "%s-rendering-%s_trimmed_<n>.png"
                     ) % (self.synset, self.mesh_hash, str(i).zfill(2))
                 elif self.split == "val":
                     path_base = (
-                        "/DATA_PATH/bts-pred/"
+                        "{self.data_dir}/bts-pred/"
                         "normals/val/<n>/3dr2n2-renders-hr_3dr2n2-renders-hr-%s-"
                         "%s-rendering-%s_trimmed_<n>.png"
                     ) % (self.synset, self.mesh_hash, str(i).zfill(2))
@@ -1114,7 +1036,5 @@ class InferenceExample(object):
     @property
     def max_depth_224(self):
         if not hasattr(self, "_max_depth_224"):
-            self._max_depth_224 = self._batch_resize(
-                self.max_depth_512.copy(), (224, 224), "nearest"
-            )
+            self._max_depth_224 = self._batch_resize(self.max_depth_512.copy(), (224, 224), "nearest")
         return self._max_depth_224

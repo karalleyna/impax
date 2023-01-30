@@ -238,7 +238,7 @@ def write_grd(path, volume, world2grid=None):
     else:
         header += [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
     header = struct.pack(3 * "i" + 16 * "f", *header)
-    content = volume.astype("f").tostring()
+    content = volume.astype("f").tobytes()
     with base_util.FS.open(path, "wb") as f:
         f.write(header)
         f.write(content)

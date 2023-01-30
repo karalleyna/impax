@@ -131,8 +131,8 @@ def _gapsview(
     if grd is not None:
         gpath = d + "/g.grd"
         file_util.write_grd(gpath, grd, world2grid=world2grid)
-        gpath = " " + gpath + " -grid_threshold %0.6f" % grid_threshold
-    cmd = "%s/gapsview%s%s%s%s" % (
+        gpath = " " + gpath
+    cmd = "%sgapsview%s%s%s%s" % (
         path_util.gaps_path(),
         mpath,
         ppath,

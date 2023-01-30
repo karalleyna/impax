@@ -7,7 +7,18 @@ __pycache__/
 *.so
 *.ply
 impax/gaps/*
+impax/datadir
+impax/data/basedirs
+impax/data/test
+impax/data/train
+impax/data/val
+*.tfrecords
+impax/datadir/test
+impax/datadir/train
+impax/datadir/val
+impax/gaps
 impax/data2
+
 ldif/
 output/
 

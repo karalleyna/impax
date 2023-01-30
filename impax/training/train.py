@@ -35,15 +35,15 @@ def visualize_data(dataset, split):
         world2grid,
         surface_point_samples,
     ) = [
-            dataset.bounding_box_samples,
-            dataset.depth_renders,
-            dataset.mesh_name,
-            dataset.near_surface_samples,
-            dataset.grid,
-            dataset.world2grid,
-            dataset.surface_point_samples,
+            jnp.array(dataset.bounding_box_samples[0]),
+            jnp.array(dataset.depth_renders[0]),
+            dataset.mesh_name.numpy()[0],
+            jnp.array(dataset.near_surface_samples[0]),
+            jnp.array(dataset.grid[0]),
+            jnp.array(dataset.world2grid[0]),
+            jnp.array(dataset.surface_point_samples[0]),
         ]
-
+    
     gaps_util.ptsview([bounding_box_samples, near_surface_samples, surface_point_samples])
     mesh_name = mesh_name.decode(sys.getdefaultencoding())
     log.info(f"depth max: {jnp.max(depth_renders)}")
@@ -51,7 +51,7 @@ def visualize_data(dataset, split):
     assert "|" in mesh_name
     mesh_hash = mesh_name[mesh_name.find("|") + 1:]
     log.info(f"Mesh hash: {mesh_hash}")
-    dyn_obj = example.InferenceExample(split, "airplane", mesh_hash)
+    dyn_obj = example.InferenceExample(split, "airplane", mesh_hash, dynamic=True)
 
     gaps_util.gapsview(
         msh=dyn_obj.normalized_gt_mesh,
@@ -178,7 +178,7 @@ def train_and_evaluate(model_config: ml_collections.ConfigDict, workdir: str) ->
     train_iter = map(lambda x: (Observation(model_config, x), x), train_iter)
 
     if vis:
-        visualize_data(train_dataset, "train")
+        visualize_data(next(train_dataset)[0], "train")
     
     eval_dataset = _make_optimized_dataset(
         "/Users/burak/Desktop/repos/impax/impax/data2", 1, "eval", "val", eval_data_key
@@ -187,9 +187,9 @@ def train_and_evaluate(model_config: ml_collections.ConfigDict, workdir: str) ->
     eval_iter = map(lambda x: (Observation(model_config, x), x), eval_iter)
 
     # todo: do
-    steps_per_epoch = 24 // model_config.batch_size
+    steps_per_epoch = 467 // model_config.batch_size
     num_steps = int(steps_per_epoch * 1)
-    steps_per_eval = 2 // 1
+    steps_per_eval = 79 // 1
 
     steps_per_checkpoint = steps_per_epoch * 10
 
