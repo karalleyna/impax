@@ -3,9 +3,11 @@ This script trains a SIF model.
 The data is loaded using tensorflow_datasets.
 """
 
+import sys
 from typing import Any
 
 import jax
+import jax.numpy as jnp
 import ml_collections
 from flax.training import checkpoints, train_state
 from jax import random
@@ -14,10 +16,50 @@ from tqdm import tqdm
 from impax.configs.sif import get_config
 from impax.datasets.local_inputs import _make_optimized_dataset
 from impax.datasets.preprocess import preprocess
+from impax.inference import example
 from impax.models.model import StructuredImplicitModel
 from impax.models.observation import Observation
 from impax.training.loss import compute_loss
+from impax.utils import gaps_util
 from impax.utils.logging_util import log
+
+
+def visualize_data(dataset, split):
+    """Visualizes the dataset with two interactive visualizer windows."""
+    (
+        bounding_box_samples,
+        depth_renders,
+        mesh_name,
+        near_surface_samples,
+        grid,
+        world2grid,
+        surface_point_samples,
+    ) = [
+            dataset.bounding_box_samples,
+            dataset.depth_renders,
+            dataset.mesh_name,
+            dataset.near_surface_samples,
+            dataset.grid,
+            dataset.world2grid,
+            dataset.surface_point_samples,
+        ]
+
+    gaps_util.ptsview([bounding_box_samples, near_surface_samples, surface_point_samples])
+    mesh_name = mesh_name.decode(sys.getdefaultencoding())
+    log.info(f"depth max: {jnp.max(depth_renders)}")
+    log.info(f"Mesh name: {mesh_name}")
+    assert "|" in mesh_name
+    mesh_hash = mesh_name[mesh_name.find("|") + 1:]
+    log.info(f"Mesh hash: {mesh_hash}")
+    dyn_obj = example.InferenceExample(split, "airplane", mesh_hash)
+
+    gaps_util.gapsview(
+        msh=dyn_obj.normalized_gt_mesh,
+        pts=near_surface_samples[:, :3],
+        grd=grid,
+        world2grid=world2grid,
+        grid_threshold=-0.07,
+    )
 
 
 def create_model(model_config, key):
@@ -122,6 +164,8 @@ def train_and_evaluate(model_config: ml_collections.ConfigDict, workdir: str) ->
     Returns:
       Final TrainState.
     """
+    
+    vis = True
 
     key = random.PRNGKey(0)
 
@@ -133,6 +177,9 @@ def train_and_evaluate(model_config: ml_collections.ConfigDict, workdir: str) ->
     train_iter = map(lambda x_key: preprocess(model_config, x_key[0], split="train", key=x_key[1]), train_dataset)
     train_iter = map(lambda x: (Observation(model_config, x), x), train_iter)
 
+    if vis:
+        visualize_data(train_dataset, "train")
+    
     eval_dataset = _make_optimized_dataset(
         "/Users/burak/Desktop/repos/impax/impax/data2", 1, "eval", "val", eval_data_key
     )

@@ -5,16 +5,13 @@ __pycache__/
 
 # C extensions
 *.so
-impax/data/test
-impax/data/train
-impax/data/val
-impax/gaps
+*.ply
+impax/gaps/*
 impax/data2
 ldif/
 output/
 
 *.obj
-*.ply
 # Distribution / packaging
 .Python
 build/
