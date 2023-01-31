@@ -17,8 +17,8 @@ class EarlyFusionCNN(nn.Module):
     architecture: str = "r18"
 
     @nn.compact
-    def __call__(self, observation, element_length: int) -> Any:
-        x = observation.tensor
+    def __call__(self, obs_dict, element_length: int) -> Any:
+        x = obs_dict["tensor"]
 
         batch_size, num_images, height, width, num_channels = x.shape
 
@@ -62,8 +62,8 @@ class MidFusionCNN(nn.Module):
     """A CNN architecture that fuses individual image channels in the middle."""
 
     @nn.compact
-    def __call__(self, observation, element_length: int) -> Any:
-        x = observation.tensor
+    def __call__(self, obs_dict, element_length: int) -> Any:
+        x = obs_dict["tensor"]
 
         batch_size = x.shape[0]
         individual_images = jnp.split(x, indices_or_sections=x.shape[1], axis=1)

@@ -10,8 +10,7 @@ from jax import random, vmap
 
 from impax.configs.sif import get_config
 from impax.datasets.preprocess import preprocess
-from impax.models.observation import Observation
-from impax.models.prediction import Prediction
+from impax.models.observation import get_jax_input
 # local
 from impax.networks.cnn import EarlyFusionCNN, MidFusionCNN
 from impax.networks.occnet import Decoder
@@ -140,7 +139,7 @@ class StructuredImplicitModel(nn.Module):
                 flat_element_length,
             )
 
-    def _global_local_forward(self, observation):
+    def _global_local_forward(self, obs_dict):
         """A forward pass that include both template and element inference."""
 
         explicit_element_length = structured_implicit_functions.element_explicit_dof(self.model_config)
@@ -157,7 +156,7 @@ class StructuredImplicitModel(nn.Module):
         sampling_scheme = self.model_config.sampling_scheme
         implicit_parameter_length = self.model_config.implicit_parameter_length
 
-        explicit_parameters, explicit_embedding = self.inference_model(observation, explicit_element_length)
+        explicit_parameters, explicit_embedding = self.inference_model(obs_dict, explicit_element_length)
         sif = structured_implicit_functions.StructuredImplicit.from_activation(
             explicit_parameters, self, self.model_config
         )
@@ -166,10 +165,10 @@ class StructuredImplicitModel(nn.Module):
 
         if implicit_parameter_length > 0:
             (local_points, local_normals, _, _,) = geom_util.local_views_of_shape(
-                observation.surface_points,
+                obs_dict["surface_points"],
                 world2local,
                 num_local_points=self.model_config.num_local_points,
-                global_normals=observation.normals,
+                global_normals=obs_dict["normals"],
             )
             # Output shapes are both [B, EC, LPC, 3].
             if "n" not in sampling_scheme:
@@ -209,29 +208,25 @@ class StructuredImplicitModel(nn.Module):
             )
         else:
             embedding = explicit_embedding
+        
+        return (sif.flat_vector, embedding)
 
-        return Prediction(self.model_config, observation, sif, embedding)
-
-    def __call__(self, observation):
+    def __call__(self, obs_dict):
         """Evaluates the explicit and implicit parameter vectors as a Prediction."""
 
         flat_element_length = structured_implicit_functions.element_explicit_dof(self.model_config)
 
         implicit_architecture = self.model_config.implicit_architecture
         if implicit_architecture == "p":
-            return self._global_local_forward(observation)
+            return self._global_local_forward(obs_dict)
         elif implicit_architecture == "1":
-            structured_implicit_activations, embedding = self.inference_model(observation, flat_element_length)
+            structured_implicit_activations, embedding = self.inference_model(obs_dict, flat_element_length)
         elif implicit_architecture == "2":
-            structured_implicit_activations, embedding = self.twin_inference(observation)
+            structured_implicit_activations, embedding = self.twin_inference(obs_dict)
         else:
             raise ValueError(f"Invalid value for {implicit_architecture}")
 
-        structured_implicit = structured_implicit_functions.StructuredImplicit.from_activation(
-            structured_implicit_activations, self, self.model_config
-        )
-
-        return Prediction(self.model_config, observation, structured_implicit, embedding)
+        return (structured_implicit_activations, embedding)
 
     def eval_implicit_parameters(self, implicit_parameters, samples):
         """Decodes each implicit parameter vector at each of its sample points.
@@ -297,7 +292,7 @@ if __name__ == "__main__":
 
     for data in dataset:
         data = preprocess(cfg, data, "train")
-        obs = Observation(cfg, data)
+        obs = (cfg, data)
         break
 
     sif = StructuredImplicitModel(cfg, 10, False)
@@ -307,7 +302,7 @@ if __name__ == "__main__":
     for data in dataset:
         key0, key = random.split(key)
         data = preprocess(cfg, data, "train")
-        obs = Observation(cfg, data)
+        obs = get_jax_input(cfg, data)
         pred, vars = sif.apply(vars, obs, key0, mutable=["batch_stats"])
 
         break

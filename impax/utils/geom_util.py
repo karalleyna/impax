@@ -64,9 +64,7 @@ def ray_sphere_intersect(ray_start, ray_direction, sphere_center, sphere_radius,
     sphere_radius = jnp.reshape(sphere_radius, [batch_size, 1, num_spheres, 1])
     a = 1.0
     b = 2.0 * ray_direction * (ray_start - sphere_center)
-    ray_sphere_distance = jnp.sum(jnp.square(ray_start - sphere_center), axis=-1)[
-        ..., None
-    ]
+    ray_sphere_distance = jnp.sum(jnp.square(ray_start - sphere_center), axis=-1)[..., None]
     c = ray_sphere_distance - jnp.square(sphere_radius)
     discriminant = jnp.square(b) - 4 * a * c
     # Assume it's positive, then zero out later:
@@ -75,9 +73,7 @@ def ray_sphere_intersect(ray_start, ray_direction, sphere_center, sphere_radius,
     t0 = jnp.minimum(ta, tb)
     t1 = jnp.maximum(ta, tb)
     t = jnp.where(t0 > 0, t0, t1)
-    intersection_invalid = jnp.logical_or(
-        jnp.logical_or(discriminant < 0, t < 0), t > max_t
-    )
+    intersection_invalid = jnp.logical_or(jnp.logical_or(discriminant < 0, t < 0), t > max_t)
     t = jnp.where(intersection_invalid, max_t * jnp.ones_like(t), t)
     return t
 
@@ -91,13 +87,7 @@ def to_homogeneous(x, is_point: bool):
     Returns:
       Array with shape [..., K+1]. t padded to be homogeneous.
     """
-    padding = 1 if is_point else 0
-    rank = len(x.shape)
-    paddings = []
-    for _ in range(rank):
-        paddings.append([0, 0])
-    paddings[-1][1] = 1
-    return jnp.pad(x, jnp.array(paddings), mode="constant", constant_values=padding)
+    return jnp.concatenate([x, jnp.where(is_point, jnp.ones_like(x[..., 0:1]), 0)], axis=-1)
 
 
 def transform_points_with_normals(points, tx, normals=None):
@@ -122,9 +112,7 @@ def transform_points_with_normals(points, tx, normals=None):
     if are_concatenated:
         points, normals, *_ = jnp.split(points, [3, 6], axis=-1)
 
-    transformed_samples = apply_4x4(
-        points, tx, are_points=True, batch_rank=1, sample_rank=1
-    )
+    transformed_samples = apply_4x4(points, tx, are_points=True, batch_rank=1, sample_rank=1)
     if normals is not None:
         transformed_normals = apply_4x4(
             normals,
@@ -206,14 +194,10 @@ def extract_points_near_origin(points, num_points, features=None):
     if are_concatenated:
         return vmap(jnp.take_along_axis, in_axes=(0, 0))(original, selected_indices)
 
-    selected_points = vmap(lambda x, y: x[y, ...], in_axes=(0, 0))(
-        points, selected_indices
-    )
+    selected_points = vmap(lambda x, y: x[y, ...], in_axes=(0, 0))(points, selected_indices)
 
     if features is not None:
-        return selected_points, vmap(lambda x, y: x[y, ...], in_axes=(0, 0))(
-            features, selected_indices
-        )
+        return selected_points, vmap(lambda x, y: x[y, ...], in_axes=(0, 0))(features, selected_indices)
 
     return selected_points
 
@@ -271,9 +255,7 @@ def local_views_of_shape(
     #   global_num_points, 3] -> 64 * 25 * 100000 * 3 * 4 = 1.8 Gb -> bad.
     def _gather(x, y):
         ret = vmap(
-            lambda x, y: vmap(jnp.take_along_axis, in_axes=(0, 0, None))(
-                x, y[..., None], 0
-            ),
+            lambda x, y: vmap(jnp.take_along_axis, in_axes=(0, 0, None))(x, y[..., None], 0),
             in_axes=(0, 0),
         )(x, y)
         return ret
@@ -287,9 +269,7 @@ def local_views_of_shape(
         if abs_zero:
             is_zero = jnp.all(jnp.equal(global_points, 0.0), axis=-1, keepdims=True)
         else:
-            is_zero = jnp.all(
-                jnp.abs(global_points) < zero_threshold, axis=-1, keepdims=True
-            )
+            is_zero = jnp.all(jnp.abs(global_points) < zero_threshold, axis=-1, keepdims=True)
         global_points = jnp.where(is_zero, 100.0, global_points)
     _, num_frames, _, _ = world2local.shape
 
@@ -301,9 +281,7 @@ def local_views_of_shape(
         [1, num_frames, 1, 1],
     )
     ndim = world2local.ndim
-    all_local_points = jnp.matmul(
-        tiled_global, jnp.swapaxes(world2local, ndim - 2, ndim - 1)
-    )
+    all_local_points = jnp.matmul(tiled_global, jnp.swapaxes(world2local, ndim - 2, ndim - 1))
     distances = jnp.linalg.norm(all_local_points, axis=-1)
     # thresh = 4.0
     # TODO(kgenova) This is potentially a problem because it could introduce
@@ -315,9 +293,7 @@ def local_views_of_shape(
     _, top_indices = lax.top_k(sample_order, k=num_local_points)
 
     local_points = _gather(all_local_points, top_indices)
-    local_points = local_points[..., :3].reshape(
-        [batch_size, num_frames, num_local_points, 3]
-    )
+    local_points = local_points[..., :3].reshape([batch_size, num_frames, num_local_points, 3])
     is_valid = jnp.expand_dims(is_valid, axis=-1)
     points_valid = _gather(is_valid, top_indices)
     points_valid = points_valid.reshape([batch_size, num_frames, num_local_points, 1])
@@ -331,14 +307,10 @@ def local_views_of_shape(
         )
         # Normals get transformed by the inverse-transpose matrix:
         ndim = local2world.ndim
-        all_local_normals = jnp.matmul(
-            tiled_global_normals, jnp.swapaxes(local2world, ndim - 2, ndim - 1)
-        )
+        all_local_normals = jnp.matmul(tiled_global_normals, jnp.swapaxes(local2world, ndim - 2, ndim - 1))
         local_normals = _gather(all_local_normals, top_indices)
         local_normals = l2_normalize(local_normals[..., :3], axis=-1)
-        local_normals = local_normals.reshape(
-            [batch_size, num_frames, num_local_points, 3]
-        )
+        local_normals = local_normals.reshape([batch_size, num_frames, num_local_points, 3])
 
     else:
         local_normals = None
@@ -346,13 +318,9 @@ def local_views_of_shape(
     if global_features is not None:
         num_features = global_features.shape[-1]
 
-        local_features = vmap(jnp.take_along_axis, in_axes=(0, 0, None))(
-            global_features, top_indices, 0
-        )
+        local_features = vmap(jnp.take_along_axis, in_axes=(0, 0, None))(global_features, top_indices, 0)
 
-        local_features = local_features.reshape(
-            [batch_size, num_frames, num_local_points, num_features]
-        )
+        local_features = local_features.reshape([batch_size, num_frames, num_local_points, num_features])
     else:
         local_features = None
     return local_points, local_normals, local_features, points_valid
@@ -448,7 +416,7 @@ def gaps_depth_render_to_xyz(depth_image, batch_size, index_of_dodecahedron=0):
     depth_image_height, depth_image_width = depth_image.shape[1:3]
     assert index_of_dodecahedron == 0
     viewpoint = jnp.array([1.03276, 0.757946, -0.564739])
-    towards = jnp.array([-0.737684, -0.54139, 0.403385])  #  = v/-1.4
+    towards = jnp.array([-0.737684, -0.54139, 0.403385])  # = v/-1.4
     up = jnp.array([-0.47501, 0.840771, 0.259748])
 
     towards = towards / jnp.linalg.norm(towards)
@@ -463,9 +431,7 @@ def gaps_depth_render_to_xyz(depth_image, batch_size, index_of_dodecahedron=0):
     world_to_camera = jnp.reshape(jnp.linalg.inv(camera_to_world), [1, 4, 4])
     world_to_camera = jnp.tile(world_to_camera, [batch_size, 1, 1])
     xyz_image, _, _ = depth_image_to_xyz_image(depth_image, world_to_camera, xfov=0.5)
-    xyz_image = jnp.reshape(
-        xyz_image, [batch_size, depth_image_height, depth_image_width, 3]
-    )
+    xyz_image = jnp.reshape(xyz_image, [batch_size, depth_image_height, depth_image_width, 3])
     return xyz_image
 
 
@@ -507,9 +473,7 @@ def fractional_vector_projection(e0, e1, points, falloff=2.0):
         jnp.reshape(e01_normalized, [1, 1, 2]),
         transpose_b=True,
     )
-    e0p_dot_e01_normalized = (
-        jnp.reshape(e0p_dot_e01_normalized, [batch_size]) / e01_norm
-    )
+    e0p_dot_e01_normalized = jnp.reshape(e0p_dot_e01_normalized, [batch_size]) / e01_norm
     if falloff is None:
         left_sided_inside = jnp.cast(
             jnp.logical_and(e0p_dot_e01_normalized >= 0, e0p_dot_e01_normalized <= 1),
@@ -525,9 +489,7 @@ def fractional_vector_projection(e0, e1, points, falloff=2.0):
         jnp.reshape(e10_normalized, [1, 1, 2]),
         transpose_b=True,
     )
-    e1p_dot_e10_normalized = (
-        jnp.reshape(e1p_dot_e10_normalized, [batch_size]) / e01_norm
-    )
+    e1p_dot_e10_normalized = jnp.reshape(e1p_dot_e10_normalized, [batch_size]) / e01_norm
 
     # Take the maximum of the two projections so we face it from the positive
     # direction:
@@ -664,9 +626,7 @@ def depth_to_cam_jnp(images, xfov=0.5):
     """Converts a gaps depth image to camera space."""
     images = _unbatch(images)
     height, width, _ = images.shape
-    pixel_coords = jnp_util.make_coordinate_grid(
-        height, width, is_screen_space=False, is_homogeneous=False
-    )
+    pixel_coords = jnp_util.make_coordinate_grid(height, width, is_screen_space=False, is_homogeneous=False)
     nic_x = jnp.reshape(pixel_coords[:, :, 0], [height, width])
     nic_y = jnp.reshape(pixel_coords[:, :, 1], [height, width])
     # GAPS nic coordinates have an origin at the center of the image, not
@@ -733,9 +693,7 @@ def depth_dodeca_to_sdf_constraints(depth_images):
     samples = []
     constraints = []
     for i in range(20):
-        sample, constraint = depth_image_to_sdf_constraints(
-            depth_images[i], cam2world[i]
-        )
+        sample, constraint = depth_image_to_sdf_constraints(depth_images[i], cam2world[i])
         samples.append(sample)
         constraints.append(constraint)
     samples = jnp.concatenate(samples)
@@ -810,15 +768,9 @@ def depth_image_to_xyz_image(depth_images, world_to_camera, xfov=0.5):
 
     camera_to_world_mat = jnp.linalg.inv(world_to_camera)
 
-    pixel_coords = jnp_util.make_coordinate_grid(
-        height, width, is_screen_space=False, is_homogeneous=False
-    )
-    x = jnp.tile(
-        jnp.reshape(pixel_coords[:, :, 0], [1, height, width]), [batch_size, 1, 1]
-    )
-    y = jnp.tile(
-        jnp.reshape(pixel_coords[:, :, 1], [1, height, width]), [batch_size, 1, 1]
-    )
+    pixel_coords = jnp_util.make_coordinate_grid(height, width, is_screen_space=False, is_homogeneous=False)
+    x = jnp.tile(jnp.reshape(pixel_coords[:, :, 0], [1, height, width]), [batch_size, 1, 1])
+    y = jnp.tile(jnp.reshape(pixel_coords[:, :, 1], [1, height, width]), [batch_size, 1, 1])
 
     x = 2 * x - 1.0
     y = 2 * y - 1.0
@@ -840,9 +792,7 @@ def depth_image_to_xyz_image(depth_images, world_to_camera, xfov=0.5):
     camera_xyz = jnp.stack([camera_x, camera_y, camera_z, homogeneous_coord], axis=3)
     flat_camera_xyzw = jnp.reshape(camera_xyz, [batch_size, height * width, 4])
     ndim = camera_to_world_mat.ndim
-    flat_world_xyz = jnp.matmul(
-        flat_camera_xyzw, jnp.swapaxes(camera_to_world_mat, ndim - 2, ndim - 1)
-    )
+    flat_world_xyz = jnp.matmul(flat_camera_xyzw, jnp.swapaxes(camera_to_world_mat, ndim - 2, ndim - 1))
     world_xyz = jnp.reshape(flat_world_xyz, [batch_size, height, width, 4])
     world_xyz = world_xyz[:, :, :, :3]
     return world_xyz, flat_camera_xyzw[:, :, :3], flat_nic_xyz
@@ -905,9 +855,7 @@ def interpolate_from_grid_coordinates(samples, grid):
         x_coord = jnp.clip(x_coord, 0, width - 1)
         for yi, y_coord in enumerate([lower_coords[:, :, 1], upper_coords[:, :, 1]]):
             y_coord = jnp.clip(y_coord, 0, height - 1)
-            for zi, z_coord in enumerate(
-                [lower_coords[:, :, 2], upper_coords[:, :, 2]]
-            ):
+            for zi, z_coord in enumerate([lower_coords[:, :, 2], upper_coords[:, :, 2]]):
                 z_coord = jnp.clip(z_coord, 0, length - 1)
                 flat_lookup = z_coord * height * width + y_coord * width + x_coord
                 lookup_coords[xi][yi].append(flat_lookup)

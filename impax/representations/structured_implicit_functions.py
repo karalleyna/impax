@@ -421,18 +421,108 @@ def _transform_samples(samples, tx):
     return samples[..., :3]
 
 
+def get_sif_kwargs_from_activation(activation, net, model_config):
+    """Parse a network activation into a structured implicit function."""
+    ensure_net_if_needed(net, model_config)
+    constant, center, radius, iparam = _unflatten(activation, model_config)
+
+    if model_config.prediction_mode == "a":
+        constant = -jnp.abs(constant)
+    elif model_config.prediction_mode == "s":
+        constant = nn.sigmoid(constant) - 1
+    radius_var = nn.sigmoid(radius[..., 0:3])
+    max_blob_radius = 0.15
+    radius_var *= max_blob_radius
+    radius_var = radius_var * radius_var
+    if model_config.coordinates == "cov":
+        # radius_rot = sigma(radius[..., 3:], 50.0)
+        max_euler_angle = jnp.pi / 4.0
+        radius_rot = jnp.clip(radius[..., 3:], -max_euler_angle, max_euler_angle)
+        # radius_rot *= max_euler_angle
+        radius = jnp.concatenate([radius_var, radius_rot], axis=-1)
+    else:
+        radius = radius_var
+    center = center / 2.0
+    return dict(constants=constant, centers=center, radius=radius, iparams=iparam)
+
+
+def compute_world2local(_model_config, constants, centers, radius):
+    """Computes a transformation to the local element frames for encoding."""
+    # We assume the center is an XYZ position for this transformation:
+    # TODO(kgenova) Update this transformation to account for rotation.
+    ec, bs = constants.shape[1], constants.shape[0]
+
+    if _model_config.transformations == "i":
+        return jnp.repeat(
+            jnp.repeat(jnp.eye(4)[None, None, ...], repeats=bs, axis=0),
+            repeats=ec,
+            axis=1,
+        )
+
+    if "c" in _model_config.transformations:
+        tx = jnp.repeat(
+            jnp.repeat(jnp.eye(3)[None, None, ...], repeats=bs, axis=0),
+            repeats=ec,
+            axis=1,
+        )
+        centers = jnp.reshape(centers, [bs, ec, 3, 1])
+        tx = jnp.concatenate([tx, -centers], axis=-1)
+        lower_row = jnp.tile(
+            jnp.reshape(jnp.array([0.0, 0.0, 0.0, 1.0]), [1, 1, 1, 4]),
+            [bs, ec, 1, 1],
+        ).astype(jnp.float32)
+
+        tx = jnp.concatenate([tx, lower_row], axis=-2)
+    else:
+        tx = jnp.repeat(
+            jnp.repeat(jnp.eye(4)[None, None, ...], repeats=bs, axis=0),
+            repeats=ec,
+            axis=1,
+        )
+
+    # Compute a rotation transformation if necessary:
+    if ("r" in _model_config.transformations) and (_model_config.coordinates == "cov"):
+        # Apply the inverse rotation:
+        rotation = jnp.linalg.inv(camera_util.roll_pitch_yaw_to_rotation_matrices(radius[..., 3:6]))
+    else:
+        rotation = jnp.repeat(
+            jnp.repeat(jnp.eye(3)[None, None, ...], repeats=bs, axis=0),
+            repeats=ec,
+            axis=1,
+        )
+
+    # Compute a scale transformation if necessary:
+    if ("s" in _model_config.transformations) and (_model_config.coordinates in ["aa", "cov"]):
+        diag = radius[..., 0:3]
+        diag = 1.0 / (jnp.sqrt(diag + 1e-8) + 1e-8)
+        diag_shape = diag.shape
+        diag = diag.reshape((-1, diag_shape[-1]))
+
+        scale = jax.vmap(jnp.diag, in_axes=0)(diag).reshape(diag_shape + (diag_shape[-1],))
+    else:
+        scale = jnp.repeat(
+            jnp.repeat(jnp.eye(3)[None, None, ...], repeats=bs, axis=0),
+            repeats=ec,
+            axis=1,
+        )
+
+    # Apply both transformations and return the transformed points.
+    tx3x3 = jnp.matmul(scale, rotation)
+    return jnp.matmul(homogenize(tx3x3), tx)
+
+
 class StructuredImplicit(object):
     """A (batch of) structured implicit function(s)."""
 
-    def __init__(self, constants, centers, radii, iparams, net, model_config):
+    def __init__(self, constants, centers, radius, iparams, net, model_config):
         batching_dims = constants.shape[:-2]
         batching_rank = len(batching_dims)
         if batching_rank == 0:
             constants = jnp.expand_dims(constants, axis=0)
-            radii = jnp.expand_dims(radii, axis=0)
+            radius = jnp.expand_dims(radius, axis=0)
             centers = jnp.expand_dims(centers, axis=0)
         self._constants = constants
-        self._radii = radii
+        self._radii = radius
         self._centers = centers
         self._iparams = iparams
         self._model_config = model_config
@@ -719,7 +809,7 @@ class StructuredImplicit(object):
                 raise ValueError(
                     "iparams have element count %i, local samples have element_count %i" % (eec, sample_eec)
                 )
-            values = self.net.eval_implicit_parameters(iparams, local_samples)
+            values = self.net(iparams, local_samples)
             return values
 
     def rbf_influence_at_samples(self, samples):

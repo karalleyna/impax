@@ -18,7 +18,8 @@ from impax.datasets.local_inputs import _make_optimized_dataset
 from impax.datasets.preprocess import preprocess
 from impax.inference import example
 from impax.models.model import StructuredImplicitModel
-from impax.models.observation import Observation
+from impax.models.observation import get_jax_input
+from impax.representations import structured_implicit_functions
 from impax.training.loss import compute_loss
 from impax.utils import gaps_util
 from impax.utils.logging_util import log
@@ -26,24 +27,16 @@ from impax.utils.logging_util import log
 
 def visualize_data(dataset, split):
     """Visualizes the dataset with two interactive visualizer windows."""
-    (
-        bounding_box_samples,
-        depth_renders,
-        mesh_name,
-        near_surface_samples,
-        grid,
-        world2grid,
-        surface_point_samples,
-    ) = [
-            jnp.array(dataset.bounding_box_samples[0]),
-            jnp.array(dataset.depth_renders[0]),
-            dataset.mesh_name.numpy()[0],
-            jnp.array(dataset.near_surface_samples[0]),
-            jnp.array(dataset.grid[0]),
-            jnp.array(dataset.world2grid[0]),
-            jnp.array(dataset.surface_point_samples[0]),
-        ]
-    
+    (bounding_box_samples, depth_renders, mesh_name, near_surface_samples, grid, world2grid, surface_point_samples,) = [
+        jnp.array(dataset.bounding_box_samples[0]),
+        jnp.array(dataset.depth_renders[0]),
+        dataset.mesh_name.numpy()[0],
+        jnp.array(dataset.near_surface_samples[0]),
+        jnp.array(dataset.grid[0]),
+        jnp.array(dataset.world2grid[0]),
+        jnp.array(dataset.surface_point_samples[0]),
+    ]
+
     gaps_util.ptsview([bounding_box_samples, near_surface_samples, surface_point_samples])
     mesh_name = mesh_name.decode(sys.getdefaultencoding())
     log.info(f"depth max: {jnp.max(depth_renders)}")
@@ -72,9 +65,9 @@ def initialized(key, model, model_config):
         "/Users/burak/Desktop/repos/impax/impax/data2", model_config.batch_size, "train", "train", key=key
     )
     data = preprocess(model_config, next(dataset)[0], "train", key)
-    observation = Observation(model_config, data)
+    obs_dict = get_jax_input(model_config, data)
 
-    variables = model.init(key, observation)
+    variables = jax.jit(model.init)(key, obs_dict)
 
     return variables["params"], variables["batch_stats"]
 
@@ -87,42 +80,54 @@ def get_optimizer(model_config):
 
 def train_step(state, batch, model, model_config):
     """Perform a single training step."""
-    obs, training_ex = batch
+    obs_dict, training_ex = batch
     model_config.train = True
 
     def loss_fn(params):
         """loss function used for training."""
-        prediction, new_model_state = state.apply_fn(
+        (activations, embeddings), new_model_state = state.apply_fn(
             {"params": params, "batch_stats": state.batch_stats},
-            obs,
-            mutable=["batch_stats"],
+            obs_dict,
+            mutable=("batch_stats",),
         )
-        loss = compute_loss(model_config, training_ex, prediction.structured_implicit)
+
+        structed_implicit = structured_implicit_functions.StructuredImplicit.from_activation(
+            activations,
+            model.bind({"params": params, "batch_stats": state.batch_stats}).eval_implicit_parameters,
+            model_config,
+        )
+
+        loss = compute_loss(model_config, training_ex, structed_implicit)
         # weight_penalty_params = jax.tree_util.tree_leaves(params)
         # weight_decay = 0.0001
         # weight_l2 = sum(jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1)
         # weight_penalty = weight_decay * 0.5 * weight_l2
         # loss = loss + weight_penalty
-        return loss, (new_model_state, prediction)
+        return loss, new_model_state
 
     grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
     aux, grads = grad_fn(state.params)
     # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
 
-    new_model_state, predictions = aux[1]
+    new_model_state = aux[1]
 
     new_state = state.apply_gradients(grads=grads, batch_stats=new_model_state["batch_stats"])
     return new_state, aux[0]
 
 
-def eval_step(state, batch, model_config):
+def eval_step(state, model, batch, model_config):
     model_config.train = False
-
-    model_config.batch_size = 1
     obs, training_ex = batch
     variables = {"params": state.params, "batch_stats": state.batch_stats}
-    predictions = state.apply_fn(variables, obs, mutable=False)
-    loss = compute_loss(model_config, training_ex, predictions.structured_implicit)
+    (activations, _) = state.apply_fn(variables, obs)
+
+    structed_implicit = structured_implicit_functions.StructuredImplicit.from_activation(
+        activations,
+        model.bind({"params": state.params, "batch_stats": state.batch_stats}, mutable=False).eval_implicit_parameters,
+        model_config,
+    )
+
+    loss = compute_loss(model_config, training_ex, structed_implicit)
     return loss
 
 
@@ -146,7 +151,7 @@ def create_train_state(rng, model_config: ml_collections.ConfigDict, model):
     tx = model_config.optimizer(model_config.learning_rate)
 
     state = TrainState.create(
-        apply_fn=model.apply,
+        apply_fn=jax.jit(model.apply, static_argnames=["mutable"]),
         params=params,
         tx=tx,
         batch_stats=batch_stats,
@@ -164,27 +169,27 @@ def train_and_evaluate(model_config: ml_collections.ConfigDict, workdir: str) ->
     Returns:
       Final TrainState.
     """
-    
-    vis = True
+
+    vis = False
 
     key = random.PRNGKey(0)
 
     key, train_data_key, eval_data_key = random.split(key, 3)
 
     train_dataset = _make_optimized_dataset(
-        "/Users/burak/Desktop/repos/impax/impax/data2", model_config.batch_size, "train", "train", train_data_key
+        "/Users/burak/Desktop/repos/impax/impax/datadir", model_config.batch_size, "train", "train", train_data_key
     )
     train_iter = map(lambda x_key: preprocess(model_config, x_key[0], split="train", key=x_key[1]), train_dataset)
-    train_iter = map(lambda x: (Observation(model_config, x), x), train_iter)
+    train_iter = map(lambda x: (get_jax_input(model_config, x), x), train_iter)
 
     if vis:
         visualize_data(next(train_dataset)[0], "train")
-    
+
     eval_dataset = _make_optimized_dataset(
-        "/Users/burak/Desktop/repos/impax/impax/data2", 1, "eval", "val", eval_data_key
+        "/Users/burak/Desktop/repos/impax/impax/datadir", 1, "eval", "val", eval_data_key
     )
     eval_iter = map(lambda x_key: preprocess(model_config, x_key[0], split="eval", key=x_key[1]), eval_dataset)
-    eval_iter = map(lambda x: (Observation(model_config, x), x), eval_iter)
+    eval_iter = map(lambda x: (get_jax_input(model_config, x), x), eval_iter)
 
     # todo: do
     steps_per_epoch = 467 // model_config.batch_size
@@ -195,7 +200,6 @@ def train_and_evaluate(model_config: ml_collections.ConfigDict, workdir: str) ->
 
     key, create_key = random.split(key)
     model = create_model(model_config, create_key)
-
     key, init_key = random.split(key)
     state = create_train_state(init_key, model_config, model)
     state = restore_checkpoint(state, workdir)
@@ -224,7 +228,7 @@ def train_and_evaluate(model_config: ml_collections.ConfigDict, workdir: str) ->
                 model_config.batch_size = 1
                 for _ in range(steps_per_eval):
                     eval_batch = next(eval_iter)
-                    loss = eval_step(state, eval_batch, model_config)
+                    loss = eval_step(state, model, eval_batch, model_config)
                     eval_loss.append(loss)
                 model_config.batch_size = pbs
 
