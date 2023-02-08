@@ -11,6 +11,18 @@ Our aim was to port/reimplement [ldif](https://github.com/google/ldif) repositor
 
 Below one can find our abstract to obtain more details about this repository.
 
+### Usage
+
+The repository is not its final state. Due to constraints on labor and time, we implemented up-to training loop. Unfortunately, we are not able to share preprocessed dataset which this work highly depends on. Follow the preprocessing steps in [ldif](https://github.com/google/ldif) repository to prepare data.
+
+- Installation of requirements from requirements.txt
+- Preparation of dataset using ShapeNet meshes and original repository.
+- Starting training using 'training/train.py' script, and one can modify the configs folder to change the training scheme, we refer to original repository here.
+
+We try to create a one-to-one correspondence between repositories, however, switching from tf1 to JAX is not a straightforward task. Please read necessary documentations for the functions if you have problems.
+
+To be able to run unit tests you need to clone original repository to the same folder and then you can run 'pytest /impax/tests/' to see coverage.
+
 
 ### Abstract
 
