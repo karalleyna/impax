@@ -3,8 +3,9 @@
 
 Hello everyone, we are a project group from Machine Learning for 3D Geometry course, affiliated with Technical University of Munich. We did this as a course project and also to enable further developments in this area.
 
-- Burak Ömür
 - Aleyna Kara
+- Burak Ömür
+
 
 
 Our aim was to port/reimplement [ldif](https://github.com/google/ldif) repository for JAX. We constantly used documentation/code from the provided repository. Our aim is to spread this 3D Shape Representation and Reconstruction task to multiple frameworks.
